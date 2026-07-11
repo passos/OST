@@ -1,0 +1,577 @@
+import AppKit
+import Combine
+import Foundation
+import OSTCore
+import OSTMLX
+import OSTPlatform
+
+@MainActor
+final class AppModel: ObservableObject {
+    let preferences: PreferencesStore
+    let overlayState: OverlayState
+    let modelDownloader: ModelDownloaderClient
+    let translationPackCoordinator: TranslationPackCoordinator
+    let modelCatalog: ModelCatalog
+
+    @Published private(set) var captureState: CaptureState = .idle
+    @Published private(set) var overlayVisible = true
+    @Published private(set) var appleSpeechSupportedLanguages: Set<SupportedLanguage> = []
+    @Published var selectedSettingsTab: SettingsTab = .general
+    @Published private(set) var sessionLoggingError: String?
+
+    private let registry = ProviderRegistry()
+    private let stateMachine = CaptureStateMachine()
+    private let recovery = CaptureRecoveryCoordinator()
+    private let segmentStore = SegmentStore()
+    private let translationScheduler = TranslationScheduler()
+    private let audioCapture = CoreAudioTapCapture()
+    private let appleSpeech = AppleSpeechProvider()
+    private let appleTranslation = AppleTranslationProvider()
+    private let qwenASR = Qwen3ASRAdapter()
+    private let qwenTranslation = Qwen3TranslationAdapter()
+    private let powerMonitor = PowerStateMonitor()
+    private let overlayCoordinator: OverlayCoordinator
+    private let sessionLogWriter = SessionLogWriter()
+
+    private var transcriptionTask: Task<Void, Never>?
+    private var translationUpdatesTask: Task<Void, Never>?
+    private var powerTask: Task<Void, Never>?
+    private var captureEventsTask: Task<Void, Never>?
+    private var terminationObserver: NSObjectProtocol?
+    private var activeTranscriptionProvider: (any TranscriptionProvider)?
+    private var mlxTranslationReady = false
+    private var activated = false
+    private var cancellables: Set<AnyCancellable> = []
+    private var activeSessionLogDirectory: URL?
+
+    init() {
+        let preferences = PreferencesStore()
+        let overlayState = OverlayState()
+        self.preferences = preferences
+        self.overlayState = overlayState
+        modelDownloader = ModelDownloaderClient()
+        translationPackCoordinator = TranslationPackCoordinator()
+        modelCatalog = try! ModelCatalog.bundled()
+        overlayCoordinator = OverlayCoordinator(state: overlayState, preferences: preferences)
+        translationPackCoordinator.onFailure = { [weak overlayState, weak preferences] in
+            let language = preferences?.appDisplayLanguage ?? .english
+            overlayState?.statusText = AppCopy.text("Translation pack setup failed — showing transcript", language: language)
+        }
+        preferences.onChange = { [weak self] _ in
+            self?.overlayCoordinator.applyPreferences()
+            Task { [weak self] in
+                guard let self else { return }
+                self.overlayState.segments = await self.segmentStore.visibleSegments(
+                    limit: self.overlayRetentionLimit
+                )
+            }
+        }
+        preferences.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        overlayState.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        modelDownloader.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+        translationPackCoordinator.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+    }
+
+    func activate() async {
+        guard !activated else { return }
+        activated = true
+        await registry.register(appleSpeech)
+        await registry.register(appleTranslation)
+        await registry.register(qwenASR)
+        await registry.register(qwenTranslation)
+        appleSpeechSupportedLanguages = await AppleSpeechProvider.runtimeSupportedLanguages()
+        overlayCoordinator.show()
+        startTranslationUpdates()
+        startPowerMonitoring()
+        startCaptureEventMonitoring()
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.stop() }
+        }
+    }
+
+    func start() async {
+        guard captureState != .running,
+              captureState != .requestingPermission,
+              captureState != .preparingModels else { return }
+        do {
+            if case .failed = captureState {
+                try await transition(to: .idle)
+            }
+            await segmentStore.clear()
+            overlayState.clear()
+            let transcriptionConfiguration = try transcriptionConfiguration()
+            let provider = try await registry.transcriptionProvider(
+                id: preferences.transcriptionProvider,
+                configuration: transcriptionConfiguration
+            )
+
+            try await transition(to: .requestingPermission)
+            let audio = try await audioCapture.start()
+            overlayState.isListening = true
+            await startSessionLoggingIfNeeded()
+            try await transition(to: .preparingModels)
+            try await provider.prepare(configuration: transcriptionConfiguration)
+            activeTranscriptionProvider = provider
+            try await prepareSelectedMLXTranslationIfNeeded()
+            try await transition(to: .running)
+            overlayState.statusText = t("Capturing")
+
+            transcriptionTask = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    let events = await provider.transcribe(audio)
+                    for try await event in events {
+                        guard !Task.isCancelled else { break }
+                        await self.handleTranscript(event)
+                    }
+                } catch {
+                    await self.fail(Self.captureFailure(from: error))
+                }
+            }
+        } catch {
+            let failure = Self.captureFailure(from: error)
+            if failure == .automaticModelMissing {
+                showModelSettings()
+            }
+            await fail(failure)
+        }
+    }
+
+    func stop() async {
+        guard captureState == .running || captureState == .preparingModels else { return }
+        do {
+            try await transition(to: .stopping)
+        } catch {
+            captureState = .stopping
+        }
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        await activeTranscriptionProvider?.stop()
+        activeTranscriptionProvider = nil
+        await translationScheduler.cancelAll()
+        await appleTranslation.cancelAll()
+        await qwenTranslation.cancelAll()
+        await qwenTranslation.unload()
+        await audioCapture.stop()
+        await stopSessionLogging()
+        mlxTranslationReady = false
+        overlayState.isListening = false
+        do {
+            try await transition(to: .idle)
+        } catch {
+            captureState = .idle
+        }
+        overlayState.statusText = t("Stopped")
+    }
+
+    func restartCapture() async {
+        if captureState == .running { await stop() }
+        await start()
+    }
+
+    func toggleOverlayVisibility() {
+        overlayCoordinator.toggleVisibility()
+        overlayVisible = overlayCoordinator.isVisible
+    }
+
+    func toggleOverlayLock() {
+        preferences.overlayLocked.toggle()
+    }
+
+    func resetOverlayFrames() {
+        overlayCoordinator.resetFrames()
+    }
+
+    func openAudioPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func chooseSessionLogDirectory() {
+        let panel = NSOpenPanel()
+        panel.title = t("Choose a folder for session files")
+        panel.prompt = t("Choose")
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let bookmark = try url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            preferences.sessionLogDirectoryBookmark = bookmark
+            preferences.sessionLogDirectoryPath = url.path
+            preferences.sessionLoggingEnabled = true
+            sessionLoggingError = nil
+        } catch {
+            sessionLoggingError = "The selected folder could not be saved."
+        }
+    }
+
+    func revealSessionLogDirectory() {
+        guard let path = preferences.sessionLogDirectoryPath else { return }
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+    }
+
+    func revealModel(_ descriptor: ModelDescriptor) {
+        guard let directory = installedDirectory(for: descriptor) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([directory])
+    }
+
+    func openSettings(tab: SettingsTab? = nil) {
+        if let tab { selectedSettingsTab = tab }
+        NSApp.activate()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        Task { @MainActor in
+            await Task.yield()
+            let settingsWindow = NSApp.windows.first {
+                $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
+            }
+            settingsWindow?.makeKeyAndOrderFront(nil)
+            settingsWindow?.orderFrontRegardless()
+        }
+    }
+
+    private func showModelSettings() {
+        openSettings(tab: .models)
+    }
+
+    private func handleTranscript(_ event: TranscriptEvent) async {
+        let segments = await segmentStore.merge(
+            event,
+            limit: overlayRetentionLimit
+        )
+        overlayState.segments = segments
+        switch event {
+        case .unsupportedLanguage:
+            overlayState.statusText = t("Unsupported language")
+            return
+        case .silence:
+            overlayState.statusText = t("Silence")
+            return
+        case .overload:
+            overlayState.statusText = t("Processing delay")
+            return
+        case .segment(let segment):
+            overlayState.detectedLanguage = segment.language
+            overlayState.statusText = t("Capturing")
+        }
+        guard let segment = event.segment else { return }
+        if segment.isFinal {
+            try? await sessionLogWriter.recordTranscript(id: segment.id, text: segment.sourceText)
+        }
+
+        if segment.language == preferences.targetLanguage {
+            await translationScheduler.submit(
+                event,
+                target: preferences.targetLanguage,
+                primary: appleTranslation
+            )
+            return
+        }
+
+        do {
+            let providers = try await translationProviders(source: segment.language)
+            await translationScheduler.submit(
+                event,
+                target: preferences.targetLanguage,
+                primary: providers.primary,
+                fallback: providers.fallback
+            )
+        } catch let error as AppleTranslationProviderError {
+            if case .languagePackNotInstalled(let source, let target) = error {
+                overlayState.statusText = t("Preparing translation language pack")
+                translationPackCoordinator.request(source: source, target: target) { [weak self] in
+                    await self?.handleTranscript(event)
+                }
+            } else {
+                overlayState.statusText = t("Unsupported translation language pair")
+            }
+        } catch {
+            overlayState.statusText = t("Translation provider setup failed")
+        }
+    }
+
+    private func translationProviders(
+        source: SupportedLanguage
+    ) async throws -> (primary: any TranslationProvider, fallback: (any TranslationProvider)?) {
+        let target = preferences.targetLanguage
+        if preferences.translationProvider == .qwen3Translation, mlxTranslationReady {
+            await qwenTranslation.setPromptTemplate(preferences.mlxTranslationPrompt)
+            let primary = try await registry.translationProvider(
+                id: .qwen3Translation,
+                source: source,
+                target: target
+            )
+            try await primary.prepare(source: source, target: target)
+            let fallback: (any TranslationProvider)?
+            do {
+                let apple = try await registry.translationProvider(
+                    id: .appleTranslation,
+                    source: source,
+                    target: target
+                )
+                try await apple.prepare(source: source, target: target)
+                fallback = apple
+            } catch {
+                fallback = nil
+            }
+            return (primary, fallback)
+        }
+
+        let primary = try await registry.translationProvider(
+            id: .appleTranslation,
+            source: source,
+            target: target
+        )
+        try await primary.prepare(source: source, target: target)
+        return (primary, nil)
+    }
+
+    private func prepareSelectedMLXTranslationIfNeeded() async throws {
+        mlxTranslationReady = false
+        guard preferences.translationProvider == .qwen3Translation else { return }
+        guard let descriptor = modelCatalog.models.first(where: {
+            $0.id == preferences.selectedTranslationModelID && $0.task == .translation
+        }), let directory = installedDirectory(for: descriptor) else {
+            overlayState.statusText = t("MLX translation model unavailable — using Apple Translation")
+            return
+        }
+        do {
+            try await qwenTranslation.loadModel(at: directory)
+            mlxTranslationReady = true
+        } catch {
+            overlayState.statusText = t("MLX translation model failed to load — using Apple Translation")
+        }
+    }
+
+    private func transcriptionConfiguration() throws -> TranscriptionConfiguration {
+        if preferences.transcriptionProvider == .appleSpeech {
+            guard case .fixed = preferences.sourceMode else {
+                throw ProviderRegistryError.automaticDetectionUnsupported(.appleSpeech)
+            }
+            return TranscriptionConfiguration(
+                sourceMode: preferences.sourceMode,
+                chineseScriptPreference: preferences.chineseScriptPreference,
+                endpointSilenceSeconds: preferences.endpointSilenceSeconds
+            )
+        }
+
+        guard let descriptor = modelCatalog.models.first(where: {
+            $0.id == preferences.selectedASRModelID && $0.task == .transcription
+        }), let directory = installedDirectory(for: descriptor) else {
+            throw CaptureFailure.automaticModelMissing
+        }
+        return TranscriptionConfiguration(
+            sourceMode: preferences.sourceMode,
+            chineseScriptPreference: preferences.chineseScriptPreference,
+            modelDirectory: directory,
+            endpointSilenceSeconds: preferences.endpointSilenceSeconds
+        )
+    }
+
+    private func installedDirectory(for descriptor: ModelDescriptor) -> URL? {
+        guard let container = ModelStoreLayout.containerURL() else { return nil }
+        let directory = ModelStoreLayout.modelDirectory(for: descriptor, in: container)
+        let metadataURL = ModelStoreLayout.metadataURL(for: descriptor, in: container)
+        guard FileManager.default.fileExists(atPath: directory.path),
+              let data = try? Data(contentsOf: metadataURL),
+              let metadata = try? JSONDecoder().decode(ModelInstallMetadata.self, from: data),
+              metadata.id == descriptor.id,
+              metadata.revision == descriptor.revision else {
+            return nil
+        }
+        return directory
+    }
+
+    private func startTranslationUpdates() {
+        translationUpdatesTask = Task { [weak self] in
+            guard let self else { return }
+            for await update in translationScheduler.updates {
+                guard !Task.isCancelled else { return }
+                switch update {
+                case .translated(let segmentID, let text, let isFinal, _):
+                    self.overlayState.segments = await self.segmentStore.applyTranslation(
+                        segmentID: segmentID,
+                        text: text,
+                        limit: self.overlayRetentionLimit
+                    )
+                    self.overlayState.statusText = self.t("Capturing")
+                    if isFinal {
+                        try? await self.sessionLogWriter.recordTranslation(id: segmentID, text: text)
+                    }
+                case .failed:
+                    self.overlayState.statusText = self.t("Translation failed — showing transcript")
+                }
+            }
+        }
+    }
+
+    private func startPowerMonitoring() {
+        powerTask = Task { [weak self] in
+            guard let self else { return }
+            for await event in powerMonitor.events {
+                switch event {
+                case .willSleep:
+                    if await recovery.prepareForSleep(state: captureState) {
+                        overlayState.isListening = false
+                        await audioCapture.suspendForSleep()
+                    }
+                case .didWake:
+                    if await recovery.shouldRestartAfterWake(
+                        permissionAvailable: true,
+                        outputDeviceAvailable: true
+                    ) {
+                        do {
+                            try await audioCapture.resumeAfterWake()
+                            overlayState.isListening = true
+                        } catch {
+                            await fail(Self.captureFailure(from: error))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func startCaptureEventMonitoring() {
+        captureEventsTask = Task { [weak self] in
+            guard let self else { return }
+            for await event in audioCapture.events {
+                guard captureState == .running else { continue }
+                switch event {
+                case .running: overlayState.statusText = t("Capturing")
+                case .reconfiguring: overlayState.statusText = t("Reconfiguring audio output")
+                case .failed(let error):
+                    if case .permissionDenied = error {
+                        await fail(.permissionRevoked)
+                    } else {
+                        await fail(Self.captureFailure(from: error))
+                    }
+                case .stopped: break
+                }
+            }
+        }
+    }
+
+    private func transition(to state: CaptureState) async throws {
+        captureState = try await stateMachine.transition(to: state)
+    }
+
+    private var overlayRetentionLimit: Int {
+        preferences.overlayLineCount * 4
+    }
+
+    private func fail(_ failure: CaptureFailure) async {
+        if captureState == .stopping { return }
+        do {
+            captureState = try await stateMachine.transition(to: .failed(failure))
+        } catch {
+            captureState = .failed(failure)
+        }
+        overlayState.statusText = AppCopy.captureFailure(failure, language: preferences.appDisplayLanguage)
+        transcriptionTask?.cancel()
+        transcriptionTask = nil
+        await activeTranscriptionProvider?.stop()
+        activeTranscriptionProvider = nil
+        await translationScheduler.cancelAll()
+        await appleTranslation.cancelAll()
+        await qwenTranslation.cancelAll()
+        await qwenTranslation.unload()
+        await audioCapture.stop()
+        await stopSessionLogging()
+        mlxTranslationReady = false
+        overlayState.isListening = false
+    }
+
+    private func startSessionLoggingIfNeeded() async {
+        sessionLoggingError = nil
+        guard preferences.sessionLoggingEnabled,
+              let bookmark = preferences.sessionLogDirectoryBookmark else { return }
+        var stale = false
+        do {
+            let directory = try URL(
+                resolvingBookmarkData: bookmark,
+                options: .withSecurityScope,
+                relativeTo: nil,
+                bookmarkDataIsStale: &stale
+            )
+            guard directory.startAccessingSecurityScopedResource() else {
+                throw CocoaError(.fileReadNoPermission)
+            }
+            activeSessionLogDirectory = directory
+            if stale {
+                preferences.sessionLogDirectoryBookmark = try directory.bookmarkData(
+                    options: .withSecurityScope,
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+            }
+            try await sessionLogWriter.start(directory: directory)
+        } catch {
+            activeSessionLogDirectory?.stopAccessingSecurityScopedResource()
+            activeSessionLogDirectory = nil
+            sessionLoggingError = "Session files could not be created in the selected folder."
+        }
+    }
+
+    private func stopSessionLogging() async {
+        await sessionLogWriter.finish()
+        activeSessionLogDirectory?.stopAccessingSecurityScopedResource()
+        activeSessionLogDirectory = nil
+    }
+
+    private func t(_ english: String) -> String {
+        AppCopy.text(english, language: preferences.appDisplayLanguage)
+    }
+
+    private static func captureFailure(from error: Error) -> CaptureFailure {
+        if let failure = error as? CaptureFailure { return failure }
+        if let audioError = error as? CoreAudioTapError {
+            switch audioError {
+            case .permissionDenied: return .permissionDenied
+            case .outputDeviceUnavailable: return .outputDeviceUnavailable
+            default: return .audioSystem(audioError.localizedDescription)
+            }
+        }
+        if let registryError = error as? ProviderRegistryError {
+            switch registryError {
+            case .automaticDetectionUnsupported: return .automaticModelMissing
+            case .languageUnsupported(_, let language): return .unsupportedLanguage(language)
+            default: return .modelLoadFailed
+            }
+        }
+        if let speechError = error as? AppleSpeechProviderError {
+            switch speechError {
+            case .automaticModeUnsupported: return .automaticModelMissing
+            case .localeUnsupported(let language): return .unsupportedLanguage(language)
+            case .assetUnavailable(let language): return .speechLanguagePackUnavailable(language)
+            case .incompatibleAudioFormat: return .audioSystem("The transcription audio format is incompatible.")
+            case .notPrepared: return .modelLoadFailed
+            }
+        }
+        if let mlxError = error as? Qwen3ASRAdapterError {
+            switch mlxError {
+            case .unsupportedLanguage: return .unsupportedDetectedLanguage
+            case .modelDirectoryMissing, .modelNotPrepared: return .modelLoadFailed
+            }
+        }
+        return .modelLoadFailed
+    }
+}

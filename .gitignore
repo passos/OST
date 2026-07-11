@@ -1,20 +1,11 @@
-# Build output
-build/
-.test-tmp/
-OST.zip
-release-zip-check
-
-# Xcode
-OST.xcodeproj/
-*.xcworkspace/
-xcuserdata/
-DerivedData/
-
-# macOS
 .DS_Store
-
-# Reference project (not part of OST)
-ref-project/
-
-# OMC state
-.omc/
+.build/
+.cache/
+DerivedData/
+DerivedDataTests/
+dist/*
+!dist/OST-0.2.0-macos-arm64.zip
+*.xcuserstate
+xcuserdata/
+Models/
+*.mlmodelc

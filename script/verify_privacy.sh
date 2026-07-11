@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP="$ROOT_DIR/DerivedData/Build/Products/Debug/OST.app"
+XPC="$APP/Contents/XPCServices/OSTModelDownloaderXPC.xpc"
+MAIN_INFO="$ROOT_DIR/Xcode/OSTApp/Info.plist"
+MAIN_ENTITLEMENTS="$ROOT_DIR/Xcode/OSTApp/OSTApp.entitlements"
+XPC_INFO="$ROOT_DIR/Xcode/ModelDownloaderXPC/Info.plist"
+XPC_ENTITLEMENTS="$ROOT_DIR/Xcode/ModelDownloaderXPC/ModelDownloaderXPC.entitlements"
+
+plutil -lint "$MAIN_INFO" "$MAIN_ENTITLEMENTS" "$XPC_INFO" "$XPC_ENTITLEMENTS"
+
+for key in \
+  com.apple.security.network.client \
+  com.apple.security.device.audio-input \
+  com.apple.security.personal-information.accessibility; do
+  if /usr/libexec/PlistBuddy -c "Print :$key" "$MAIN_ENTITLEMENTS" >/dev/null 2>&1; then
+    echo "Main app source entitlements unexpectedly contain $key." >&2
+    exit 1
+  fi
+done
+
+for key in NSMicrophoneUsageDescription NSScreenCaptureUsageDescription NSSpeechRecognitionUsageDescription NSAccessibilityUsageDescription; do
+  if plutil -extract "$key" raw "$MAIN_INFO" >/dev/null 2>&1; then
+    echo "Main app Info.plist unexpectedly contains $key." >&2
+    exit 1
+  fi
+done
+
+plutil -extract NSAudioCaptureUsageDescription raw "$MAIN_INFO" >/dev/null
+/usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.client' "$XPC_ENTITLEMENTS" >/dev/null
+
+if rg -q 'PCMChunk|TranscriptSegment|sourceText|translatedText|audio' \
+  "$ROOT_DIR/Sources/OSTCore/XPC/ModelDownloaderXPC.swift"; then
+  echo "XPC protocol source unexpectedly exposes user-content types." >&2
+  exit 1
+fi
+
+echo "Static privacy boundary checks passed."
+
+if [[ "${1:-}" == "--static" ]]; then
+  exit 0
+fi
+
+if [[ ! -d "$APP" || ! -d "$XPC" ]]; then
+  echo "Build OST.app with the embedded XPC service first." >&2
+  exit 1
+fi
+
+codesign --verify --deep --strict --verbose=2 "$APP"
+codesign -dvvv --entitlements - "$APP"
+codesign -dvvv --entitlements - "$XPC"
+plutil -p "$APP/Contents/Info.plist"
+plutil -p "$XPC/Contents/Info.plist"
+
+if codesign -d --entitlements - "$APP" 2>&1 | rg -q 'com.apple.security.network.client'; then
+  echo "Main app unexpectedly has outbound network entitlement." >&2
+  exit 1
+fi
+
+if ! codesign -d --entitlements - "$XPC" 2>&1 | rg -q 'com.apple.security.network.client'; then
+  echo "Downloader XPC is missing outbound network entitlement." >&2
+  exit 1
+fi

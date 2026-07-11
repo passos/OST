@@ -1,0 +1,58 @@
+name: Publish Release Asset
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify 0.2.0 artifact
+        run: |
+          set -euo pipefail
+          artifact="dist/OST-0.2.0-macos-arm64.zip"
+          test -s "$artifact"
+          sha256sum "$artifact"
+          unzip -t "$artifact"
+          unzip -Z1 "$artifact" | grep -Fxq 'OST.app/Contents/MacOS/OST'
+          ! unzip -Z1 "$artifact" | grep -Eq '(^__MACOSX/|(^|/)\._|(^|/)\.DS_Store$)'
+          rm -rf /tmp/ost-release-check
+          unzip -q "$artifact" -d /tmp/ost-release-check
+          python3 - <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          plist = plistlib.loads(Path("/tmp/ost-release-check/OST.app/Contents/Info.plist").read_bytes())
+          assert plist["CFBundleIdentifier"] == "com.reserve.OST"
+          assert plist["CFBundleShortVersionString"] == "0.2.0"
+          assert plist["CFBundleVersion"] == "2"
+          assert plist["LSUIElement"] is True
+          PY
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: OST 0.2.0
+          body: |
+            ## OST 0.2.0
+
+            A complete rewrite for macOS 26+ on Apple Silicon.
+
+            - Stable multi-line transcript and translation overlays with two reserved preview lines
+            - Apple Speech/Translation and optional local MLX ASR/translation models
+            - English, Chinese, Japanese, and Korean app UI (English by default)
+            - Optional local per-session transcript and translation files (off by default)
+            - Model download, Finder reveal, and deletion controls
+            - No feature sends audio, transcripts, translations, settings, or saved session files outside the Mac
+
+            This asset is ad-hoc signed because no Developer ID certificate is available in the release environment. See the README installation note if macOS quarantine blocks first launch.
+          files: dist/OST-0.2.0-macos-arm64.zip
+          fail_on_unmatched_files: true

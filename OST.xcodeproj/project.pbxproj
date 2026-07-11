@@ -1,0 +1,225 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B00100000000000000000001 /* OSTCore in Frameworks */ = {isa = PBXBuildFile; productRef = D00100000000000000000001 /* OSTCore */; };
+		B00100000000000000000002 /* OSTPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = D00100000000000000000002 /* OSTPlatform */; };
+		B00100000000000000000003 /* OSTMLX in Frameworks */ = {isa = PBXBuildFile; productRef = D00100000000000000000003 /* OSTMLX */; };
+		B00100000000000000000004 /* OSTCore in Frameworks */ = {isa = PBXBuildFile; productRef = D00100000000000000000004 /* OSTCore */; };
+		B00100000000000000000005 /* OSTDownloader in Frameworks */ = {isa = PBXBuildFile; productRef = D00100000000000000000005 /* OSTDownloader */; };
+		B00100000000000000000006 /* OSTCore in Frameworks */ = {isa = PBXBuildFile; productRef = D00100000000000000000006 /* OSTCore */; };
+		B00100000000000000000007 /* OSTModelDownloaderXPC.xpc in Embed XPC Services */ = {isa = PBXBuildFile; fileRef = F00100000000000000000002 /* OSTModelDownloaderXPC.xpc */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C00100000000000000000001 = {isa = PBXContainerItemProxy; containerPortal = P00100000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = T00100000000000000000002; remoteInfo = OSTModelDownloaderXPC; };
+		C00100000000000000000002 = {isa = PBXContainerItemProxy; containerPortal = P00100000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = T00100000000000000000001; remoteInfo = OST; };
+		C00100000000000000000003 = {isa = PBXContainerItemProxy; containerPortal = P00100000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = T00100000000000000000001; remoteInfo = OST; };
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E00100000000000000000001 /* Embed XPC Services */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/XPCServices;
+			dstSubfolderSpec = 1;
+			files = (
+				B00100000000000000000007 /* OSTModelDownloaderXPC.xpc in Embed XPC Services */,
+			);
+			name = "Embed XPC Services";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		F00100000000000000000001 /* OST.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OST.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00100000000000000000002 /* OSTModelDownloaderXPC.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = OSTModelDownloaderXPC.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00100000000000000000003 /* OSTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OSTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F00100000000000000000004 /* OSTUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OSTUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		G00100000000000000000003 /* OSTApp */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources/OSTApp; sourceTree = "<group>"; };
+		G00100000000000000000004 /* ModelDownloaderXPC */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources/OSTModelDownloaderXPC; sourceTree = "<group>"; };
+		G00100000000000000000005 /* OSTTests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Xcode/OSTTests; sourceTree = "<group>"; };
+		G00100000000000000000006 /* OSTUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Xcode/OSTUITests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		H00100000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B00100000000000000000001, B00100000000000000000002, B00100000000000000000003, ); runOnlyForDeploymentPostprocessing = 0; };
+		H00100000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B00100000000000000000004, B00100000000000000000005, ); runOnlyForDeploymentPostprocessing = 0; };
+		H00100000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B00100000000000000000006, ); runOnlyForDeploymentPostprocessing = 0; };
+		H00100000000000000000004 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G00100000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				G00100000000000000000003 /* OSTApp */,
+				G00100000000000000000004 /* ModelDownloaderXPC */,
+				G00100000000000000000005 /* OSTTests */,
+				G00100000000000000000006 /* OSTUITests */,
+				G00100000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G00100000000000000000002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F00100000000000000000001 /* OST.app */,
+				F00100000000000000000002 /* OSTModelDownloaderXPC.xpc */,
+				F00100000000000000000003 /* OSTTests.xctest */,
+				F00100000000000000000004 /* OSTUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T00100000000000000000001 /* OST */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00100000000000000000002 /* Build configuration list for PBXNativeTarget "OST" */;
+			buildPhases = (S00100000000000000000001, H00100000000000000000001, R00100000000000000000001, E00100000000000000000001, );
+			buildRules = ();
+			dependencies = (Y00100000000000000000001, );
+			fileSystemSynchronizedGroups = (G00100000000000000000003, );
+			name = OST;
+			packageProductDependencies = (D00100000000000000000001, D00100000000000000000002, D00100000000000000000003, );
+			productName = OST;
+			productReference = F00100000000000000000001 /* OST.app */;
+			productType = "com.apple.product-type.application";
+		};
+		T00100000000000000000002 /* OSTModelDownloaderXPC */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00100000000000000000003 /* Build configuration list for PBXNativeTarget "OSTModelDownloaderXPC" */;
+			buildPhases = (S00100000000000000000002, H00100000000000000000002, R00100000000000000000002, );
+			buildRules = ();
+			dependencies = ();
+			fileSystemSynchronizedGroups = (G00100000000000000000004, );
+			name = OSTModelDownloaderXPC;
+			packageProductDependencies = (D00100000000000000000004, D00100000000000000000005, );
+			productName = OSTModelDownloaderXPC;
+			productReference = F00100000000000000000002 /* OSTModelDownloaderXPC.xpc */;
+			productType = "com.apple.product-type.xpc-service";
+		};
+		T00100000000000000000003 /* OSTTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00100000000000000000004 /* Build configuration list for PBXNativeTarget "OSTTests" */;
+			buildPhases = (S00100000000000000000003, H00100000000000000000003, R00100000000000000000003, );
+			buildRules = ();
+			dependencies = (Y00100000000000000000002, );
+			fileSystemSynchronizedGroups = (G00100000000000000000005, );
+			name = OSTTests;
+			packageProductDependencies = (D00100000000000000000006, );
+			productName = OSTTests;
+			productReference = F00100000000000000000003 /* OSTTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		T00100000000000000000004 /* OSTUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L00100000000000000000005 /* Build configuration list for PBXNativeTarget "OSTUITests" */;
+			buildPhases = (S00100000000000000000004, H00100000000000000000004, R00100000000000000000004, );
+			buildRules = ();
+			dependencies = (Y00100000000000000000003, );
+			fileSystemSynchronizedGroups = (G00100000000000000000006, );
+			name = OSTUITests;
+			packageProductDependencies = ();
+			productName = OSTUITests;
+			productReference = F00100000000000000000004 /* OSTUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		P00100000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					T00100000000000000000001 = {CreatedOnToolsVersion = 26.6; ProvisioningStyle = Automatic; };
+					T00100000000000000000002 = {CreatedOnToolsVersion = 26.6; ProvisioningStyle = Automatic; };
+					T00100000000000000000003 = {CreatedOnToolsVersion = 26.6; TestTargetID = T00100000000000000000001; };
+					T00100000000000000000004 = {CreatedOnToolsVersion = 26.6; TestTargetID = T00100000000000000000001; };
+				};
+			};
+			buildConfigurationList = L00100000000000000000001 /* Build configuration list for PBXProject "OST" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, "zh-Hans", ja, ko, Base, );
+			mainGroup = G00100000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (K00100000000000000000001 /* XCLocalSwiftPackageReference "." */, );
+			preferredProjectObjectVersion = 77;
+			productRefGroup = G00100000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (T00100000000000000000001, T00100000000000000000002, T00100000000000000000003, T00100000000000000000004, );
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		R00100000000000000000001 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		R00100000000000000000002 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		R00100000000000000000003 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		R00100000000000000000004 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		S00100000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		S00100000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		S00100000000000000000003 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		S00100000000000000000004 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		Y00100000000000000000001 = {isa = PBXTargetDependency; target = T00100000000000000000002 /* OSTModelDownloaderXPC */; targetProxy = C00100000000000000000001; };
+		Y00100000000000000000002 = {isa = PBXTargetDependency; target = T00100000000000000000001 /* OST */; targetProxy = C00100000000000000000002; };
+		Y00100000000000000000003 = {isa = PBXTargetDependency; target = T00100000000000000000001 /* OST */; targetProxy = C00100000000000000000003; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		Q00100000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_OPTIMIZATION_LEVEL = 0; MACOSX_DEPLOYMENT_TARGET = 26.0; ONLY_ACTIVE_ARCH = YES; SDKROOT = macosx; SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)"; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 6.0; }; name = Debug; };
+		Q00100000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; COPY_PHASE_STRIP = YES; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; GCC_C_LANGUAGE_STANDARD = gnu17; MACOSX_DEPLOYMENT_TARGET = 26.0; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 6.0; }; name = Release; };
+		Q00100000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = Xcode/OSTApp/OSTApp.entitlements; CODE_SIGN_STYLE = Automatic; COMBINE_HIDPI_IMAGES = YES; CURRENT_PROJECT_VERSION = 2; DEVELOPMENT_TEAM = ""; ENABLE_APP_SANDBOX = YES; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Xcode/OSTApp/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; MARKETING_VERSION = 0.2.0; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OST; PRODUCT_NAME = OST; SKIP_INSTALL = NO; SUPPORTED_PLATFORMS = macosx; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = complete; }; name = Debug; };
+		Q00100000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = Xcode/OSTApp/OSTApp.entitlements; CODE_SIGN_STYLE = Automatic; COMBINE_HIDPI_IMAGES = YES; CURRENT_PROJECT_VERSION = 2; DEVELOPMENT_TEAM = ""; ENABLE_APP_SANDBOX = YES; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Xcode/OSTApp/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks"; MARKETING_VERSION = 0.2.0; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OST; PRODUCT_NAME = OST; SKIP_INSTALL = NO; SUPPORTED_PLATFORMS = macosx; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = complete; }; name = Release; };
+		Q00100000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = Xcode/ModelDownloaderXPC/ModelDownloaderXPC.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; DEVELOPMENT_TEAM = ""; ENABLE_APP_SANDBOX = YES; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Xcode/ModelDownloaderXPC/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks"; MARKETING_VERSION = 0.2.0; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OST.ModelDownloader; PRODUCT_NAME = OSTModelDownloaderXPC; SKIP_INSTALL = YES; SUPPORTED_PLATFORMS = macosx; SWIFT_STRICT_CONCURRENCY = complete; }; name = Debug; };
+		Q00100000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = Xcode/ModelDownloaderXPC/ModelDownloaderXPC.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 2; DEVELOPMENT_TEAM = ""; ENABLE_APP_SANDBOX = YES; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Xcode/ModelDownloaderXPC/Info.plist; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks"; MARKETING_VERSION = 0.2.0; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OST.ModelDownloader; PRODUCT_NAME = OSTModelDownloaderXPC; SKIP_INSTALL = YES; SUPPORTED_PLATFORMS = macosx; SWIFT_STRICT_CONCURRENCY = complete; }; name = Release; };
+		Q00100000000000000000007 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OSTTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_STRICT_CONCURRENCY = complete; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OST.app/Contents/MacOS/OST"; }; name = Debug; };
+		Q00100000000000000000008 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OSTTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_STRICT_CONCURRENCY = complete; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/OST.app/Contents/MacOS/OST"; }; name = Release; };
+		Q00100000000000000000009 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OSTUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_STRICT_CONCURRENCY = complete; TEST_TARGET_NAME = OST; }; name = Debug; };
+		Q0010000000000000000000A /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.reserve.OSTUITests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_STRICT_CONCURRENCY = complete; TEST_TARGET_NAME = OST; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		L00100000000000000000001 /* Build configuration list for PBXProject "OST" */ = {isa = XCConfigurationList; buildConfigurations = (Q00100000000000000000001, Q00100000000000000000002, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00100000000000000000002 /* Build configuration list for PBXNativeTarget "OST" */ = {isa = XCConfigurationList; buildConfigurations = (Q00100000000000000000003, Q00100000000000000000004, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00100000000000000000003 /* Build configuration list for PBXNativeTarget "OSTModelDownloaderXPC" */ = {isa = XCConfigurationList; buildConfigurations = (Q00100000000000000000005, Q00100000000000000000006, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00100000000000000000004 /* Build configuration list for PBXNativeTarget "OSTTests" */ = {isa = XCConfigurationList; buildConfigurations = (Q00100000000000000000007, Q00100000000000000000008, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		L00100000000000000000005 /* Build configuration list for PBXNativeTarget "OSTUITests" */ = {isa = XCConfigurationList; buildConfigurations = (Q00100000000000000000009, Q0010000000000000000000A, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		K00100000000000000000001 /* XCLocalSwiftPackageReference "." */ = {isa = XCLocalSwiftPackageReference; relativePath = .; };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D00100000000000000000001 /* OSTCore */ = {isa = XCSwiftPackageProductDependency; productName = OSTCore; };
+		D00100000000000000000002 /* OSTPlatform */ = {isa = XCSwiftPackageProductDependency; productName = OSTPlatform; };
+		D00100000000000000000003 /* OSTMLX */ = {isa = XCSwiftPackageProductDependency; productName = OSTMLX; };
+		D00100000000000000000004 /* OSTCore */ = {isa = XCSwiftPackageProductDependency; productName = OSTCore; };
+		D00100000000000000000005 /* OSTDownloader */ = {isa = XCSwiftPackageProductDependency; productName = OSTDownloader; };
+		D00100000000000000000006 /* OSTCore */ = {isa = XCSwiftPackageProductDependency; productName = OSTCore; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = P00100000000000000000001 /* Project object */;
+}
