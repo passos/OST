@@ -6,6 +6,17 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 
 "$ROOT_DIR/script/verify_privacy.sh" --static
 
+mkdir -p "$ROOT_DIR/.cache/swiftpm" "$ROOT_DIR/.cache/clang"
+
+SWIFTPM_MODULECACHE_OVERRIDE="$ROOT_DIR/.cache/swiftpm" \
+CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.cache/clang" \
+swift test \
+  --package-path "$ROOT_DIR" \
+  --scratch-path "$ROOT_DIR/.build" \
+  --disable-sandbox \
+  --disable-automatic-resolution \
+  --jobs 4
+
 ARGS=(
   -project "$ROOT_DIR/OST.xcodeproj"
   -scheme OST

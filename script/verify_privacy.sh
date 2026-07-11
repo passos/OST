@@ -31,6 +31,23 @@ done
 plutil -extract NSAudioCaptureUsageDescription raw "$MAIN_INFO" >/dev/null
 /usr/libexec/PlistBuddy -c 'Print :com.apple.security.network.client' "$XPC_ENTITLEMENTS" >/dev/null
 
+for key in \
+  com.apple.security.device.audio-input \
+  com.apple.security.personal-information.accessibility \
+  com.apple.security.files.user-selected.read-write; do
+  if /usr/libexec/PlistBuddy -c "Print :$key" "$XPC_ENTITLEMENTS" >/dev/null 2>&1; then
+    echo "Downloader XPC source entitlements unexpectedly contain $key." >&2
+    exit 1
+  fi
+done
+
+for key in NSAudioCaptureUsageDescription NSMicrophoneUsageDescription NSScreenCaptureUsageDescription; do
+  if plutil -extract "$key" raw "$XPC_INFO" >/dev/null 2>&1; then
+    echo "Downloader XPC Info.plist unexpectedly contains $key." >&2
+    exit 1
+  fi
+done
+
 if rg -q 'PCMChunk|TranscriptSegment|sourceText|translatedText|audio' \
   "$ROOT_DIR/Sources/OSTCore/XPC/ModelDownloaderXPC.swift"; then
   echo "XPC protocol source unexpectedly exposes user-content types." >&2
@@ -63,3 +80,13 @@ if ! codesign -d --entitlements - "$XPC" 2>&1 | rg -q 'com.apple.security.networ
   echo "Downloader XPC is missing outbound network entitlement." >&2
   exit 1
 fi
+
+for key in \
+  com.apple.security.device.audio-input \
+  com.apple.security.personal-information.accessibility \
+  com.apple.security.files.user-selected.read-write; do
+  if codesign -d --entitlements - "$XPC" 2>&1 | rg -q "$key"; then
+    echo "Signed downloader XPC unexpectedly contains $key." >&2
+    exit 1
+  fi
+done
