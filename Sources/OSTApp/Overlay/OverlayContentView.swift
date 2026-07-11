@@ -11,6 +11,19 @@ struct OverlayContentView: View {
     let kind: OverlayPanelKind
     @ObservedObject var state: OverlayState
     @ObservedObject var preferences: PreferencesStore
+    let isSettingsPreview: Bool
+
+    init(
+        kind: OverlayPanelKind,
+        state: OverlayState,
+        preferences: PreferencesStore,
+        isSettingsPreview: Bool = false
+    ) {
+        self.kind = kind
+        self.state = state
+        self.preferences = preferences
+        self.isSettingsPreview = isSettingsPreview
+    }
 
     var body: some View {
         draggableContent
@@ -24,7 +37,7 @@ struct OverlayContentView: View {
                     .stroke(.white.opacity(0.08), lineWidth: 1)
             }
             .overlay(alignment: .bottomTrailing) {
-                if !preferences.overlayLocked {
+                if !preferences.overlayLocked, !isSettingsPreview {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.45))
@@ -38,7 +51,7 @@ struct OverlayContentView: View {
 
     @ViewBuilder
     private var draggableContent: some View {
-        if preferences.overlayLocked {
+        if preferences.overlayLocked || isSettingsPreview {
             content
         } else {
             content

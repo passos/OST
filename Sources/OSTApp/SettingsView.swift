@@ -374,6 +374,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                 Button(t("Reset overlay position and size")) { model.resetOverlayFrames() }
             }
+            Section(t("Overlay window preview")) {
+                Text(t("This example follows the selected window arrangement, confirmed line count, alignment, text styles, background color, and opacity."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                OverlaySettingsPreview(preferences: model.preferences)
+            }
         }
         .formStyle(.grouped)
     }

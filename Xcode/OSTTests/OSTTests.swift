@@ -1,5 +1,6 @@
 import OSTCore
 @testable import OST
+import SwiftUI
 import XCTest
 
 final class OSTTests: XCTestCase {
@@ -26,5 +27,40 @@ final class OSTTests: XCTestCase {
         XCTAssertNotEqual(AppCopy.text(key, language: .chinese), key)
         XCTAssertNotEqual(AppCopy.text(key, language: .japanese), key)
         XCTAssertNotEqual(AppCopy.text(key, language: .korean), key)
+    }
+
+    func testOverlayWindowPreviewCopyIsLocalized() {
+        let keys = [
+            "Overlay window preview",
+            "Transcript window",
+            "Translation window",
+            "The current transcription preview appears here.",
+            "This example follows the selected window arrangement, confirmed line count, alignment, text styles, background color, and opacity.",
+        ]
+        for key in keys {
+            XCTAssertNotEqual(AppCopy.text(key, language: .chinese), key)
+            XCTAssertNotEqual(AppCopy.text(key, language: .japanese), key)
+            XCTAssertNotEqual(AppCopy.text(key, language: .korean), key)
+        }
+    }
+
+    @MainActor
+    func testOverlayWindowPreviewRendersCombinedAndSplitLayouts() {
+        let suiteName = "OSTTests.overlay-preview.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = PreferencesStore(userDefaults: defaults)
+
+        for layout in [OverlayLayout.combined, .split] {
+            preferences.overlayLayout = layout
+            preferences.overlayLineCount = layout == .combined ? 3 : 10
+            let renderer = ImageRenderer(content:
+                OverlaySettingsPreview(preferences: preferences)
+                    .frame(width: 580)
+                    .padding(16)
+            )
+            renderer.scale = 1
+            XCTAssertNotNil(renderer.nsImage, "Could not render \(layout.rawValue) preview")
+        }
     }
 }
