@@ -1,4 +1,5 @@
 import OSTCore
+@testable import OST
 import XCTest
 
 final class OSTTests: XCTestCase {
@@ -17,5 +18,13 @@ final class OSTTests: XCTestCase {
         XCTAssertEqual(snapshot.appDisplayLanguage, .english)
         XCTAssertFalse(snapshot.sessionLoggingEnabled)
         XCTAssertNil(snapshot.sessionLogDirectoryBookmark)
+    }
+
+    func testAppleTranslationDisclosureIsLocalized() {
+        let key = "When Apple Translation is used, macOS may send Apple non-content technical information such as the app identifier and selected language pair. Your audio, transcript, and translation text are not included."
+        XCTAssertEqual(AppCopy.text(key, language: .english), key)
+        XCTAssertNotEqual(AppCopy.text(key, language: .chinese), key)
+        XCTAssertNotEqual(AppCopy.text(key, language: .japanese), key)
+        XCTAssertNotEqual(AppCopy.text(key, language: .korean), key)
     }
 }

@@ -405,6 +405,7 @@ struct SettingsView: View {
             Section(t("Data stays on this Mac")) {
                 Text(t("OST processes audio, transcripts, and translations on this Mac. The app has no feature that uploads or sends your audio, transcript, translation, settings, or saved session files outside your computer."))
                 Text(t("Internet access is used only when you choose to download a model. OST receives model files and does not send your content."))
+                Text(t("When Apple Translation is used, macOS may send Apple non-content technical information such as the app identifier and selected language pair. Your audio, transcript, and translation text are not included."))
             }
         }
         .formStyle(.grouped)
