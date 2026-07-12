@@ -23,7 +23,7 @@ struct OSTApp: App {
         MenuBarExtra {
             MenuBarView(model: model)
         } label: {
-            Label("OST", systemImage: "captions.bubble")
+            SettingsSceneBridgeLabel()
                 .translationTask(model.translationPackCoordinator.configuration) { session in
                     await model.translationPackCoordinator.prepare(using: session)
                 }
@@ -32,6 +32,46 @@ struct OSTApp: App {
         Settings {
             SettingsView(model: model)
                 .environment(\.locale, Locale(identifier: model.preferences.appDisplayLanguage.localeIdentifier))
+        }
+    }
+}
+
+extension Notification.Name {
+    static let ostOpenSettings = Notification.Name("com.reserve.OST.open-settings")
+}
+
+private struct SettingsSceneBridgeLabel: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Label("OST", systemImage: "captions.bubble")
+            .onReceive(NotificationCenter.default.publisher(for: .ostOpenSettings)) { _ in
+                NSApp.activate(ignoringOtherApps: true)
+                openSettings()
+                Task { @MainActor in
+                    await SettingsWindowPresenter.bringForward()
+                }
+            }
+    }
+}
+
+@MainActor
+enum SettingsWindowPresenter {
+    private static let settingsWindowIdentifier = "com_apple_SwiftUI_Settings_window"
+
+    static func bringForward() async {
+        NSApp.activate(ignoringOtherApps: true)
+        for attempt in 0..<20 {
+            if let window = NSApp.windows.first(where: {
+                $0.identifier?.rawValue == settingsWindowIdentifier
+            }) {
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+                return
+            }
+            if attempt < 19 {
+                try? await Task.sleep(for: .milliseconds(50))
+            }
         }
     }
 }

@@ -24,6 +24,8 @@ Use this checklist for a release candidate built on macOS 26 or later on Apple S
 ## Launch and permissions
 
 - Launch the packaged app and confirm the OST icon appears in the menu bar without a Dock icon.
+- On a clean first launch, confirm the overlay is unlocked and can be moved or resized; after locking it, relaunch and confirm the saved lock choice is restored.
+- Choose **Settings…** and confirm the Settings window opens in front as the active key window.
 - Start capture and confirm macOS requests only System Audio Capture permission.
 - Deny permission and confirm OST shows a clear error and a button to open the relevant System Settings page.
 - Grant permission, restart capture, and confirm system audio is transcribed.

@@ -13,13 +13,27 @@ final class OSTTests: XCTestCase {
 
     func testMainPrivacyDefaults() {
         let snapshot = PreferencesSnapshot()
-        XCTAssertTrue(snapshot.overlayLocked)
+        XCTAssertFalse(snapshot.overlayLocked)
         XCTAssertEqual(snapshot.backgroundOpacity, 0.65)
         XCTAssertEqual(snapshot.sourceFontSize, 20)
         XCTAssertEqual(snapshot.translationFontSize, 28)
         XCTAssertEqual(snapshot.appDisplayLanguage, .english)
         XCTAssertFalse(snapshot.sessionLoggingEnabled)
         XCTAssertNil(snapshot.sessionLogDirectoryBookmark)
+    }
+
+    @MainActor
+    func testFirstLaunchOverlayIsUnlockedAndSavedChoicePersists() {
+        let suiteName = "OSTTests.first-launch-overlay.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstLaunch = PreferencesStore(userDefaults: defaults)
+        XCTAssertFalse(firstLaunch.overlayLocked)
+        firstLaunch.overlayLocked = true
+
+        let restored = PreferencesStore(userDefaults: defaults)
+        XCTAssertTrue(restored.overlayLocked)
     }
 
     func testAppleTranslationDisclosureIsLocalized() {
@@ -110,5 +124,28 @@ final class OSTTests: XCTestCase {
                 )
             }
         }
+    }
+
+    @MainActor
+    func testSettingsRequestOpensVisibleKeyWindow() async throws {
+        let model = AppModel()
+        model.openSettings(tab: .overlay)
+
+        var settingsWindow: NSWindow?
+        for _ in 0..<40 {
+            settingsWindow = NSApp.windows.first {
+                $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
+            }
+            if settingsWindow?.isVisible == true, settingsWindow?.isKeyWindow == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+
+        XCTAssertEqual(model.selectedSettingsTab, .overlay)
+        XCTAssertNotNil(settingsWindow)
+        XCTAssertTrue(settingsWindow?.isVisible == true)
+        XCTAssertTrue(settingsWindow?.isKeyWindow == true)
+        settingsWindow?.orderOut(nil)
     }
 }

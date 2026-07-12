@@ -197,6 +197,7 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
         from: Data("{}".utf8)
     )
     #expect(decoded.overlayLineCount == 3)
+    #expect(decoded.overlayLocked == true)
     #expect(decoded.endpointSilenceSeconds == 0.8)
     #expect(decoded.subtitleAlignment == .leading)
     #expect(decoded.previewFontSize == 28)

@@ -239,16 +239,7 @@ final class AppModel: ObservableObject {
 
     func openSettings(tab: SettingsTab? = nil) {
         if let tab { selectedSettingsTab = tab }
-        NSApp.activate()
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-        Task { @MainActor in
-            await Task.yield()
-            let settingsWindow = NSApp.windows.first {
-                $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
-            }
-            settingsWindow?.makeKeyAndOrderFront(nil)
-            settingsWindow?.orderFrontRegardless()
-        }
+        NotificationCenter.default.post(name: .ostOpenSettings, object: nil)
     }
 
     private func showModelSettings() {

@@ -95,7 +95,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         selectedTranslationModelID: String = "mlx-community/Qwen3-0.6B-4bit",
         mlxTranslationPrompt: String = MLXPromptDefaults.translation,
         overlayLayout: OverlayLayout = .combined,
-        overlayLocked: Bool = true,
+        overlayLocked: Bool = false,
         sourceFontSize: Double = 20,
         translationFontSize: Double = 28,
         previewFontSize: Double = 28,
