@@ -40,6 +40,7 @@ Use this checklist for a release candidate built on macOS 26 or later on Apple S
 
 ## Overlay and appearance
 
+- In Settings > Overlay, confirm the window preview immediately reflects combined/split layout, confirmed-line count, alignment, text styles, and background appearance.
 - Test combined and split windows.
 - Test 2, 3, 5, and 10 confirmed lines per area. Confirm the window grows and shrinks when the value changes.
 - Confirm two preview lines are added independently of the configured confirmed-line count.

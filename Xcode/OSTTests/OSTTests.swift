@@ -1,5 +1,6 @@
 import OSTCore
 @testable import OST
+import Foundation
 import SwiftUI
 import XCTest
 
@@ -69,5 +70,45 @@ final class OSTTests: XCTestCase {
         XCTAssertNotEqual(AppCopy.text(key, language: .chinese), key)
         XCTAssertNotEqual(AppCopy.text(key, language: .japanese), key)
         XCTAssertNotEqual(AppCopy.text(key, language: .korean), key)
+    }
+
+    func testAllLiteralAppCopyKeysAreLocalized() throws {
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourceRoot = projectRoot.appendingPathComponent("Sources/OSTApp", isDirectory: true)
+        let files = FileManager.default.enumerator(
+            at: sourceRoot,
+            includingPropertiesForKeys: nil
+        )
+        let pattern = try NSRegularExpression(
+            pattern: #"\b(?:t|text)\("((?:\\.|[^"\\])*)""#
+        )
+        var keys: Set<String> = []
+
+        while let file = files?.nextObject() as? URL {
+            guard file.pathExtension == "swift" else { continue }
+            let source = try String(contentsOf: file, encoding: .utf8)
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in pattern.matches(in: source, range: range) {
+                guard let captureRange = Range(match.range(at: 1), in: source) else { continue }
+                let escaped = String(source[captureRange])
+                guard !escaped.contains(#"\("#) else { continue }
+                let jsonString = "\"" + escaped + "\""
+                keys.insert(try JSONDecoder().decode(String.self, from: Data(jsonString.utf8)))
+            }
+        }
+
+        XCTAssertGreaterThan(keys.count, 100, "Localization source scan did not find the expected UI copy")
+        for language in [AppDisplayLanguage.chinese, .japanese, .korean] {
+            for key in keys.sorted() {
+                XCTAssertNotEqual(
+                    AppCopy.text(key, language: language),
+                    key,
+                    "Missing \(language.rawValue) translation for: \(key)"
+                )
+            }
+        }
     }
 }
