@@ -17,14 +17,20 @@ final class PreferencesStore: ObservableObject {
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
+        let initialSnapshot: PreferencesSnapshot
         if let data = userDefaults.data(forKey: Self.storageKey),
            let decoded = try? JSONDecoder().decode(PreferencesSnapshot.self, from: data) {
-            snapshot = decoded
+            initialSnapshot = decoded
         } else {
-            snapshot = PreferencesSnapshot(
+            initialSnapshot = PreferencesSnapshot(
                 sourceMode: .fixed(Self.defaultSourceLanguage()),
                 targetLanguage: Self.defaultTargetLanguage()
             )
+        }
+        snapshot = Self.normalizedTranscriptionSettings(initialSnapshot)
+        if snapshot != initialSnapshot,
+           let data = try? JSONEncoder().encode(snapshot) {
+            userDefaults.set(data, forKey: Self.storageKey)
         }
     }
 
@@ -48,6 +54,13 @@ final class PreferencesStore: ObservableObject {
     var transcriptionProvider: ProviderID {
         get { snapshot.transcriptionProvider }
         set { snapshot.transcriptionProvider = newValue }
+    }
+
+    func selectTranscriptionProvider(_ provider: ProviderID) {
+        var updated = snapshot
+        updated.transcriptionProvider = provider
+        updated = Self.normalizedTranscriptionSettings(updated)
+        snapshot = updated
     }
 
     var translationProvider: ProviderID {
@@ -175,5 +188,17 @@ final class PreferencesStore: ObservableObject {
     private static func defaultTargetLanguage() -> SupportedLanguage {
         let source = defaultSourceLanguage()
         return source == .english ? .korean : .english
+    }
+
+    private static func normalizedTranscriptionSettings(
+        _ snapshot: PreferencesSnapshot
+    ) -> PreferencesSnapshot {
+        guard snapshot.transcriptionProvider == .appleSpeech,
+              case .automatic = snapshot.sourceMode else {
+            return snapshot
+        }
+        var normalized = snapshot
+        normalized.sourceMode = .fixed(defaultSourceLanguage())
+        return normalized
     }
 }

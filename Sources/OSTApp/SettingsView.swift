@@ -599,7 +599,10 @@ struct SettingsView: View {
         )
     }
     private var transcriptionProviderBinding: Binding<ProviderID> {
-        Binding(get: { model.preferences.transcriptionProvider }, set: { model.preferences.transcriptionProvider = $0 })
+        Binding(
+            get: { model.preferences.transcriptionProvider },
+            set: { model.preferences.selectTranscriptionProvider($0) }
+        )
     }
     private var translationProviderBinding: Binding<ProviderID> {
         Binding(get: { model.preferences.translationProvider }, set: { model.preferences.translationProvider = $0 })

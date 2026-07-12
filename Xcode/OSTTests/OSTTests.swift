@@ -36,6 +36,31 @@ final class OSTTests: XCTestCase {
         XCTAssertTrue(restored.overlayLocked)
     }
 
+    @MainActor
+    func testSavedAutomaticInputIsRepairedWhenAppleSpeechIsSelected() throws {
+        let suiteName = "OSTTests.apple-speech-input.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let snapshot = PreferencesSnapshot(
+            sourceMode: .automatic,
+            transcriptionProvider: .appleSpeech
+        )
+        defaults.set(try JSONEncoder().encode(snapshot), forKey: "OST.preferences.v1")
+
+        let restored = PreferencesStore(userDefaults: defaults)
+
+        guard case .fixed = restored.sourceMode else {
+            return XCTFail("Apple Speech must not retain the unsupported automatic input mode")
+        }
+        XCTAssertEqual(restored.transcriptionProvider, .appleSpeech)
+
+        restored.sourceMode = .automatic
+        restored.selectTranscriptionProvider(.appleSpeech)
+        guard case .fixed = restored.sourceMode else {
+            return XCTFail("Selecting Apple Speech must repair automatic input immediately")
+        }
+    }
+
     func testAppleTranslationDisclosureIsLocalized() {
         let key = "When Apple Translation is used, macOS may send Apple non-content technical information such as the app identifier and selected language pair. Your audio, transcript, and translation text are not included."
         XCTAssertEqual(AppCopy.text(key, language: .english), key)

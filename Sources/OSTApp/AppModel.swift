@@ -113,15 +113,16 @@ final class AppModel: ObservableObject {
             memoryPressureTranslationFallbackActive = false
             await segmentStore.clear()
             overlayState.clear()
+
+            try await transition(to: .requestingPermission)
+            let audio = try await audioCapture.start()
+            overlayState.isListening = true
+
             let transcriptionConfiguration = try transcriptionConfiguration()
             let provider = try await registry.transcriptionProvider(
                 id: preferences.transcriptionProvider,
                 configuration: transcriptionConfiguration
             )
-
-            try await transition(to: .requestingPermission)
-            let audio = try await audioCapture.start()
-            overlayState.isListening = true
             await startSessionLoggingIfNeeded()
             try await transition(to: .preparingModels)
             try await provider.prepare(configuration: transcriptionConfiguration)

@@ -15,10 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify 0.2.0 artifact
+      - name: Verify 0.2.1 artifact
         run: |
           set -euo pipefail
-          artifact="dist/OST-0.2.0-macos-arm64.zip"
+          artifact="dist/OST-0.2.1-macos-arm64.zip"
           test -s "$artifact"
           sha256sum "$artifact"
           unzip -t "$artifact"
@@ -32,27 +32,27 @@ jobs:
 
           plist = plistlib.loads(Path("/tmp/ost-release-check/OST.app/Contents/Info.plist").read_bytes())
           assert plist["CFBundleIdentifier"] == "com.reserve.OST"
-          assert plist["CFBundleShortVersionString"] == "0.2.0"
-          assert plist["CFBundleVersion"] == "2"
+          assert plist["CFBundleShortVersionString"] == "0.2.1"
+          assert plist["CFBundleVersion"] == "3"
           assert plist["LSUIElement"] is True
           PY
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          name: OST 0.2.0
+          name: v0.2.1
           body: |
-            ## OST 0.2.0
+            ## v0.2.1
 
-            A complete rewrite for macOS 26+ on Apple Silicon.
+            This release improves settings and overlay reliability for macOS 26+ on Apple Silicon.
 
-            - Stable multi-line transcript and translation overlays with two reserved preview lines
-            - Apple Speech/Translation and optional local MLX ASR/translation models
-            - English, Chinese, Japanese, and Korean app UI (English by default)
-            - Optional local per-session transcript and translation files (off by default)
-            - Model download, Finder reveal, and deletion controls
-            - No feature sends audio, transcripts, translations, settings, or saved session files outside the Mac
+            - Settings now opens reliably in front as the active window
+            - Start requests system audio permission before model preflight and repairs incompatible saved input settings
+            - The overlay starts unlocked on a clean first launch while preserving saved choices
+            - Overlay settings include a live preview
+            - Improved localized UI copy and memory-pressure handling
+            - Added automated verification that the main app opens no network sockets
 
             This asset is ad-hoc signed because no Developer ID certificate is available in the release environment. See the README installation note if macOS quarantine blocks first launch.
-          files: dist/OST-0.2.0-macos-arm64.zip
+          files: dist/OST-0.2.1-macos-arm64.zip
           fail_on_unmatched_files: true
