@@ -80,6 +80,29 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
     #expect(await recovery.shouldReconfigureForDeviceChange(state: .idle) == false)
 }
 
+@Test func memoryPressureRecoveryKeepsASRAndDropsMLXTranslationFirst() {
+    #expect(MemoryPressureRecoveryPolicy.action(
+        level: .warning,
+        captureIsActive: true,
+        mlxTranslationIsLoaded: true
+    ) == .keepActiveModels)
+    #expect(MemoryPressureRecoveryPolicy.action(
+        level: .critical,
+        captureIsActive: true,
+        mlxTranslationIsLoaded: true
+    ) == .fallbackMLXTranslation)
+    #expect(MemoryPressureRecoveryPolicy.action(
+        level: .critical,
+        captureIsActive: true,
+        mlxTranslationIsLoaded: false
+    ) == .keepActiveModels)
+    #expect(MemoryPressureRecoveryPolicy.action(
+        level: .warning,
+        captureIsActive: false,
+        mlxTranslationIsLoaded: true
+    ) == .releaseUnusedModels)
+}
+
 @Test func overlayFrameIsClampedToVisibleScreen() {
     let visible = CGRect(x: 0, y: 0, width: 1440, height: 900)
     let restored = OverlayFrameRestorer.restoredFrame(

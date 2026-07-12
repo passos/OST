@@ -98,3 +98,30 @@ public actor CaptureRecoveryCoordinator {
         state == .running
     }
 }
+
+public enum MemoryPressureLevel: Sendable, Equatable {
+    case warning
+    case critical
+}
+
+public enum MemoryPressureRecoveryAction: Sendable, Equatable {
+    case keepActiveModels
+    case releaseUnusedModels
+    case fallbackMLXTranslation
+}
+
+public enum MemoryPressureRecoveryPolicy {
+    public static func action(
+        level: MemoryPressureLevel,
+        captureIsActive: Bool,
+        mlxTranslationIsLoaded: Bool
+    ) -> MemoryPressureRecoveryAction {
+        if !captureIsActive {
+            return .releaseUnusedModels
+        }
+        if level == .critical, mlxTranslationIsLoaded {
+            return .fallbackMLXTranslation
+        }
+        return .keepActiveModels
+    }
+}

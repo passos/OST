@@ -40,6 +40,7 @@ final class AppModel: ObservableObject {
     private var terminationObserver: NSObjectProtocol?
     private var activeTranscriptionProvider: (any TranscriptionProvider)?
     private var mlxTranslationReady = false
+    private var memoryPressureTranslationFallbackActive = false
     private var activated = false
     private var cancellables: Set<AnyCancellable> = []
     private var activeSessionLogDirectory: URL?
@@ -109,6 +110,7 @@ final class AppModel: ObservableObject {
             if case .failed = captureState {
                 try await transition(to: .idle)
             }
+            memoryPressureTranslationFallbackActive = false
             await segmentStore.clear()
             overlayState.clear()
             let transcriptionConfiguration = try transcriptionConfiguration()
@@ -126,7 +128,7 @@ final class AppModel: ObservableObject {
             activeTranscriptionProvider = provider
             try await prepareSelectedMLXTranslationIfNeeded()
             try await transition(to: .running)
-            overlayState.statusText = t("Capturing")
+            overlayState.statusText = captureStatusText
 
             transcriptionTask = Task { [weak self] in
                 guard let self else { return }
@@ -167,6 +169,7 @@ final class AppModel: ObservableObject {
         await audioCapture.stop()
         await stopSessionLogging()
         mlxTranslationReady = false
+        memoryPressureTranslationFallbackActive = false
         overlayState.isListening = false
         do {
             try await transition(to: .idle)
@@ -270,7 +273,7 @@ final class AppModel: ObservableObject {
             return
         case .segment(let segment):
             overlayState.detectedLanguage = segment.language
-            overlayState.statusText = t("Capturing")
+            overlayState.statusText = captureStatusText
         }
         guard let segment = event.segment else { return }
         if segment.isFinal {
@@ -412,7 +415,7 @@ final class AppModel: ObservableObject {
                         text: text,
                         limit: self.overlayRetentionLimit
                     )
-                    self.overlayState.statusText = self.t("Capturing")
+                    self.overlayState.statusText = self.captureStatusText
                     if isFinal {
                         try? await self.sessionLogWriter.recordTranslation(id: segmentID, text: text)
                     }
@@ -445,6 +448,8 @@ final class AppModel: ObservableObject {
                             await fail(Self.captureFailure(from: error))
                         }
                     }
+                case .memoryPressure(let level):
+                    await handleMemoryPressure(level)
                 }
             }
         }
@@ -456,7 +461,7 @@ final class AppModel: ObservableObject {
             for await event in audioCapture.events {
                 guard captureState == .running else { continue }
                 switch event {
-                case .running: overlayState.statusText = t("Capturing")
+                case .running: overlayState.statusText = captureStatusText
                 case .reconfiguring: overlayState.statusText = t("Reconfiguring audio output")
                 case .failed(let error):
                     if case .permissionDenied = error {
@@ -497,7 +502,30 @@ final class AppModel: ObservableObject {
         await audioCapture.stop()
         await stopSessionLogging()
         mlxTranslationReady = false
+        memoryPressureTranslationFallbackActive = false
         overlayState.isListening = false
+    }
+
+    private func handleMemoryPressure(_ level: MemoryPressureLevel) async {
+        let action = MemoryPressureRecoveryPolicy.action(
+            level: level,
+            captureIsActive: captureIsActive,
+            mlxTranslationIsLoaded: mlxTranslationReady
+        )
+        switch action {
+        case .keepActiveModels:
+            break
+        case .releaseUnusedModels:
+            await qwenASR.stop()
+            await qwenTranslation.unload()
+            mlxTranslationReady = false
+        case .fallbackMLXTranslation:
+            await qwenTranslation.cancelAll()
+            await qwenTranslation.unload()
+            mlxTranslationReady = false
+            memoryPressureTranslationFallbackActive = true
+            overlayState.statusText = captureStatusText
+        }
     }
 
     private func startSessionLoggingIfNeeded() async {
@@ -539,6 +567,19 @@ final class AppModel: ObservableObject {
 
     private func t(_ english: String) -> String {
         AppCopy.text(english, language: preferences.appDisplayLanguage)
+    }
+
+    private var captureIsActive: Bool {
+        switch captureState {
+        case .requestingPermission, .preparingModels, .running, .stopping: true
+        case .idle, .failed: false
+        }
+    }
+
+    private var captureStatusText: String {
+        memoryPressureTranslationFallbackActive
+            ? t("Memory pressure — using Apple Translation")
+            : t("Capturing")
     }
 
     private static func captureFailure(from error: Error) -> CaptureFailure {

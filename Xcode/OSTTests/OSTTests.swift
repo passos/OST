@@ -63,4 +63,11 @@ final class OSTTests: XCTestCase {
             XCTAssertNotNil(renderer.nsImage, "Could not render \(layout.rawValue) preview")
         }
     }
+
+    func testMemoryPressureStatusCopyIsLocalized() {
+        let key = "Memory pressure — using Apple Translation"
+        XCTAssertNotEqual(AppCopy.text(key, language: .chinese), key)
+        XCTAssertNotEqual(AppCopy.text(key, language: .japanese), key)
+        XCTAssertNotEqual(AppCopy.text(key, language: .korean), key)
+    }
 }
