@@ -51,6 +51,19 @@ open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
 }
 
+verify_main_app_has_no_network_sockets() {
+  local app_pid network_output
+  app_pid="$(pgrep -x "$APP_NAME")"
+  app_pid="${app_pid%%$'\n'*}"
+  network_output="$(lsof -n -P -a -p "$app_pid" -i 2>/dev/null || true)"
+  if [[ -n "$network_output" ]]; then
+    echo "OST main app unexpectedly opened a network socket:" >&2
+    echo "$network_output" >&2
+    exit 1
+  fi
+  echo "Verified that the OST main app has no open IP network sockets."
+}
+
 case "$MODE" in
   run)
     open_app
@@ -70,6 +83,7 @@ case "$MODE" in
     open_app
     sleep 1
     pgrep -x "$APP_NAME" >/dev/null
+    verify_main_app_has_no_network_sockets
     ;;
   *)
     echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
