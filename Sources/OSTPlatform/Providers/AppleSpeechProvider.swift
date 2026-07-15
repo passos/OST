@@ -14,9 +14,17 @@ public enum AppleSpeechProviderError: Error, Sendable {
 }
 
 public actor AppleSpeechProvider: TranscriptionProvider {
+    public static let supportedLanguages: Set<SupportedLanguage> = [
+        .english,
+        .chineseSimplified,
+        .chineseTraditional,
+        .japanese,
+        .korean,
+    ]
+
     public nonisolated let id: ProviderID = .appleSpeech
     public nonisolated let capabilities = TranscriptionCapabilities(
-        supportedLanguages: Set(SupportedLanguage.allCases),
+        supportedLanguages: AppleSpeechProvider.supportedLanguages,
         supportsAutomaticLanguageDetection: false,
         supportsVolatileResults: true
     )
@@ -28,7 +36,8 @@ public actor AppleSpeechProvider: TranscriptionProvider {
     private var sourceFormat: AVAudioFormat?
     private var inputConverter: AVAudioConverter?
     private var reservedLocale: Locale?
-    private var tasks: [Task<Void, Never>] = []
+    private var feedTask: Task<Void, Never>?
+    private var completionTasks: [Task<Void, Never>] = []
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     private var resultIdentity = AppleSpeechResultIdentityTracker()
     private var sentenceSegmenter = ProgressiveSentenceSegmenter()
@@ -39,7 +48,7 @@ public actor AppleSpeechProvider: TranscriptionProvider {
     public static func runtimeSupportedLanguages() async -> Set<SupportedLanguage> {
         guard SpeechTranscriber.isAvailable else { return [] }
         var supported: Set<SupportedLanguage> = []
-        for language in SupportedLanguage.allCases {
+        for language in supportedLanguages {
             if await SpeechTranscriber.supportedLocale(equivalentTo: language.locale) != nil {
                 supported.insert(language)
             }
@@ -50,6 +59,9 @@ public actor AppleSpeechProvider: TranscriptionProvider {
     public func prepare(configuration: TranscriptionConfiguration) async throws {
         guard case .fixed(let requestedLanguage) = configuration.sourceMode else {
             throw AppleSpeechProviderError.automaticModeUnsupported
+        }
+        guard Self.supportedLanguages.contains(requestedLanguage) else {
+            throw AppleSpeechProviderError.localeUnsupported(requestedLanguage)
         }
         guard SpeechTranscriber.isAvailable else {
             throw AppleSpeechProviderError.assetUnavailable(requestedLanguage)
@@ -131,85 +143,94 @@ public actor AppleSpeechProvider: TranscriptionProvider {
         let inputPair = AsyncStream<AnalyzerInput>.makeStream(bufferingPolicy: .bufferingNewest(32))
         inputContinuation = inputPair.continuation
 
-        return AsyncThrowingStream { outputContinuation in
-            let analysisTask = Task { [weak self] in
-                do {
-                    try await analyzer.start(inputSequence: inputPair.stream)
-                    try await analyzer.finalizeAndFinishThroughEndOfInput()
-                } catch is CancellationError {
-                    await analyzer.cancelAndFinishNow()
-                } catch {
-                    outputContinuation.finish(throwing: error)
-                }
-                await self?.removeFinishedTasks()
-            }
-            let feedTask = Task { [weak self] in
-                guard let self else { return }
-                var endpointDetector = EndpointDetector(
-                    silenceDuration: await self.configuredEndpointSilenceSeconds()
-                )
-                for await chunk in audio {
-                    guard !Task.isCancelled else { break }
-                    if endpointDetector.observe(chunk.samples) == .endpoint {
-                        let duration = Double(chunk.samples.count) / chunk.sampleRate
-                        let endTime = chunk.startTime + .seconds(duration)
-                        if let segment = await self.finalizeCurrentSegment(at: endTime) {
-                            outputContinuation.yield(.segment(segment))
-                        } else {
-                            outputContinuation.yield(.silence)
-                        }
-                    }
-                    do {
-                        let input = try await self.analyzerInput(from: chunk)
-                        inputPair.continuation.yield(input)
-                    } catch {
-                        outputContinuation.finish(throwing: error)
-                        break
-                    }
-                }
-                inputPair.continuation.finish()
-            }
-            let resultTask = Task { [weak self] in
-                do {
-                    for try await result in transcriber.results {
-                        guard !Task.isCancelled else { break }
-                        let key = Int64((CMTimeGetSeconds(result.range.start) * 1_000).rounded())
-                        let segmentID = await self?.segmentID(for: key, final: result.isFinal) ?? UUID()
-                        let start = Duration.seconds(CMTimeGetSeconds(result.range.start))
-                        let end = Duration.seconds(CMTimeGetSeconds(result.range.end))
-                        let rawSegment = TranscriptSegment(
-                            id: segmentID,
-                            startTime: start,
-                            endTime: end,
-                            language: language,
-                            sourceText: String(result.text.characters),
-                            isFinal: result.isFinal
-                        )
-                        let segments = await self?.observe(rawSegment) ?? [rawSegment]
-                        for segment in segments {
-                            outputContinuation.yield(.segment(segment))
-                        }
-                    }
-                    outputContinuation.finish()
-                } catch {
-                    outputContinuation.finish(throwing: error)
-                }
-            }
-            Task { self.storeTasks([analysisTask, feedTask, resultTask]) }
-            outputContinuation.onTermination = { _ in
-                analysisTask.cancel()
-                feedTask.cancel()
-                resultTask.cancel()
+        let outputPair = AsyncThrowingStream<TranscriptEvent, Error>.makeStream()
+        let analysisTask = Task {
+            do {
+                try await analyzer.start(inputSequence: inputPair.stream)
+                try await analyzer.finalizeAndFinishThroughEndOfInput()
+            } catch is CancellationError {
+                await analyzer.cancelAndFinishNow()
+            } catch {
+                outputPair.continuation.finish(throwing: error)
             }
         }
+        let feedTask = Task { [weak self] in
+            guard let self else { return }
+            var endpointDetector = EndpointDetector(
+                silenceDuration: await self.configuredEndpointSilenceSeconds()
+            )
+            for await chunk in audio {
+                guard !Task.isCancelled else { break }
+                if endpointDetector.observe(chunk.samples) == .endpoint {
+                    let duration = Double(chunk.samples.count) / chunk.sampleRate
+                    let endTime = chunk.startTime + .seconds(duration)
+                    if let segment = await self.finalizeCurrentSegment(at: endTime) {
+                        outputPair.continuation.yield(.segment(segment))
+                    } else {
+                        outputPair.continuation.yield(.silence)
+                    }
+                }
+                do {
+                    let input = try await self.analyzerInput(from: chunk)
+                    inputPair.continuation.yield(input)
+                } catch {
+                    outputPair.continuation.finish(throwing: error)
+                    break
+                }
+            }
+            inputPair.continuation.finish()
+        }
+        let resultTask = Task { [weak self] in
+            do {
+                for try await result in transcriber.results {
+                    guard !Task.isCancelled else { break }
+                    let key = Int64((CMTimeGetSeconds(result.range.start) * 1_000).rounded())
+                    let segmentID = await self?.segmentID(for: key, final: result.isFinal) ?? UUID()
+                    let start = Duration.seconds(CMTimeGetSeconds(result.range.start))
+                    let end = Duration.seconds(CMTimeGetSeconds(result.range.end))
+                    let rawSegment = TranscriptSegment(
+                        id: segmentID,
+                        startTime: start,
+                        endTime: end,
+                        language: language,
+                        sourceText: String(result.text.characters),
+                        isFinal: result.isFinal
+                    )
+                    let segments = await self?.observe(rawSegment) ?? [rawSegment]
+                    for segment in segments {
+                        outputPair.continuation.yield(.segment(segment))
+                    }
+                }
+                outputPair.continuation.finish()
+            } catch {
+                outputPair.continuation.finish(throwing: error)
+            }
+        }
+        self.feedTask = feedTask
+        completionTasks = [analysisTask, resultTask]
+        outputPair.continuation.onTermination = { termination in
+            guard case .cancelled = termination else { return }
+            analysisTask.cancel()
+            feedTask.cancel()
+            resultTask.cancel()
+        }
+        return outputPair.stream
     }
 
     public func stop() async {
         inputContinuation?.finish()
         inputContinuation = nil
-        for task in tasks { task.cancel() }
-        tasks.removeAll()
-        await analyzer?.cancelAndFinishNow()
+        if let feedTask {
+            feedTask.cancel()
+            await feedTask.value
+            self.feedTask = nil
+        }
+        let tasksToAwait = completionTasks
+        for task in tasksToAwait { await task.value }
+        completionTasks.removeAll()
+        if tasksToAwait.isEmpty {
+            await analyzer?.cancelAndFinishNow()
+        }
         analyzer = nil
         transcriber = nil
         inputConverter = nil
@@ -246,8 +267,9 @@ public actor AppleSpeechProvider: TranscriptionProvider {
             }
         }
 
+        let bufferStartTime = Self.analyzerTime(for: chunk.startTime)
         guard let converter = inputConverter else {
-            return AnalyzerInput(buffer: sourceBuffer)
+            return AnalyzerInput(buffer: sourceBuffer, bufferStartTime: bufferStartTime)
         }
         let ratio = analyzerFormat.sampleRate / sourceFormat.sampleRate
         guard let destination = AVAudioPCMBuffer(
@@ -269,7 +291,13 @@ public actor AppleSpeechProvider: TranscriptionProvider {
         guard status != .error else {
             throw conversionError ?? AppleSpeechProviderError.incompatibleAudioFormat
         }
-        return AnalyzerInput(buffer: destination)
+        return AnalyzerInput(buffer: destination, bufferStartTime: bufferStartTime)
+    }
+
+    static func analyzerTime(for duration: Duration) -> CMTime {
+        let components = duration.components
+        let seconds = Double(components.seconds) + Double(components.attoseconds) / 1e18
+        return CMTime(seconds: seconds, preferredTimescale: 1_000_000_000)
     }
 
     private func segmentID(for key: Int64, final: Bool) -> UUID {
@@ -286,13 +314,5 @@ public actor AppleSpeechProvider: TranscriptionProvider {
 
     private func finalizeCurrentSegment(at endTime: Duration) -> TranscriptSegment? {
         sentenceSegmenter.finalize(at: endTime)
-    }
-
-    private func storeTasks(_ newTasks: [Task<Void, Never>]) {
-        tasks = newTasks
-    }
-
-    private func removeFinishedTasks() {
-        tasks.removeAll { $0.isCancelled }
     }
 }

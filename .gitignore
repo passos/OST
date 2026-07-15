@@ -6,6 +6,7 @@ DerivedDataTests/
 dist/*
 !dist/OST-0.2.0-macos-arm64.zip
 !dist/OST-0.2.1-macos-arm64.zip
+!dist/OST-0.2.2-macos-arm64.zip
 *.xcuserstate
 xcuserdata/
 Models/

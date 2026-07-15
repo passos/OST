@@ -1,7 +1,24 @@
+import CoreMedia
 import Foundation
 import OSTCore
 @testable import OSTPlatform
 import Testing
+
+@Test func appleSpeechSupportsOnlyTheFourProductLanguages() {
+    #expect(AppleSpeechProvider.supportedLanguages == [
+        .english,
+        .chineseSimplified,
+        .chineseTraditional,
+        .japanese,
+        .korean,
+    ])
+}
+
+@Test func appleSpeechAnalyzerTimePreservesTheCapturedAudioTimeline() {
+    let time = AppleSpeechProvider.analyzerTime(for: .seconds(12) + .milliseconds(345))
+
+    #expect(abs(CMTimeGetSeconds(time) - 12.345) < 0.000_001)
+}
 
 @Test func appleSpeechStartTimeCorrectionKeepsTheActiveResultIdentity() {
     var tracker = AppleSpeechResultIdentityTracker()

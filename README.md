@@ -7,6 +7,7 @@ OST is a menu bar app for macOS 26+ that transcribes system audio and shows on-d
 ## Highlights
 
 - Apple Speech and Apple Translation are the default on-device providers.
+- Apple Speech supports English, Chinese (Simplified and Traditional), Japanese, and Korean when the corresponding system locale is available.
 - Optional Qwen3 ASR and translation models run locally with MLX.
 - Confirmed transcript and translation history stay visible while two separate lines are reserved for the current preview.
 - Each transcript and translation area supports 2–10 confirmed lines; the window resizes when this value changes.
@@ -27,9 +28,9 @@ Internet access is used only when the user chooses to download an MLX model. The
 - macOS 26.0 or later
 - Apple Silicon
 
-## Install 0.2.1
+## Install 0.2.2
 
-Download `OST-0.2.1-macos-arm64.zip` from the [v0.2.1 release](https://github.com/9bow/OST/releases/tag/v0.2.1), extract it, and move `OST.app` to Applications.
+Download `OST-0.2.2-macos-arm64.zip` from the [v0.2.2 release](https://github.com/9bow/OST/releases/tag/v0.2.2), extract it, and move `OST.app` to Applications.
 
 The current binary is ad-hoc signed because a Developer ID certificate was not available in the release environment. If macOS quarantine reports that the app cannot be verified or is damaged, remove the quarantine attribute after confirming that you downloaded it from this repository:
 
@@ -40,7 +41,7 @@ xattr -dr com.apple.quarantine /Applications/OST.app
 The release ZIP SHA-256 is published by the release workflow and can be compared with:
 
 ```bash
-shasum -a 256 OST-0.2.1-macos-arm64.zip
+shasum -a 256 OST-0.2.2-macos-arm64.zip
 ```
 
 ## Start transcribing

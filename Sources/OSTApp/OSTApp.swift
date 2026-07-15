@@ -60,14 +60,16 @@ enum SettingsWindowPresenter {
     private static let settingsWindowIdentifier = "com_apple_SwiftUI_Settings_window"
 
     static func bringForward() async {
-        NSApp.activate(ignoringOtherApps: true)
         for attempt in 0..<20 {
+            NSApp.activate(ignoringOtherApps: true)
             if let window = NSApp.windows.first(where: {
                 $0.identifier?.rawValue == settingsWindowIdentifier
             }) {
                 window.makeKeyAndOrderFront(nil)
                 window.orderFrontRegardless()
-                return
+                if window.isVisible, window.isKeyWindow {
+                    return
+                }
             }
             if attempt < 19 {
                 try? await Task.sleep(for: .milliseconds(50))

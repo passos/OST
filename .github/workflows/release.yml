@@ -15,10 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify 0.2.1 artifact
+      - name: Verify 0.2.2 artifact
         run: |
           set -euo pipefail
-          artifact="dist/OST-0.2.1-macos-arm64.zip"
+          artifact="dist/OST-0.2.2-macos-arm64.zip"
           test -s "$artifact"
           sha256sum "$artifact"
           unzip -t "$artifact"
@@ -32,27 +32,26 @@ jobs:
 
           plist = plistlib.loads(Path("/tmp/ost-release-check/OST.app/Contents/Info.plist").read_bytes())
           assert plist["CFBundleIdentifier"] == "com.reserve.OST"
-          assert plist["CFBundleShortVersionString"] == "0.2.1"
-          assert plist["CFBundleVersion"] == "3"
+          assert plist["CFBundleShortVersionString"] == "0.2.2"
+          assert plist["CFBundleVersion"] == "4"
           assert plist["LSUIElement"] is True
           PY
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          name: v0.2.1
+          name: v0.2.2
           body: |
-            ## v0.2.1
+            ## v0.2.2
 
-            This release improves settings and overlay reliability for macOS 26+ on Apple Silicon.
+            This release improves Apple SpeechAnalyzer transcription reliability for macOS 26+ on Apple Silicon.
 
-            - Settings now opens reliably in front as the active window
-            - Start requests system audio permission before model preflight and repairs incompatible saved input settings
-            - The overlay starts unlocked on a clean first launch while preserving saved choices
-            - Overlay settings include a live preview
-            - Improved localized UI copy and memory-pressure handling
-            - Added automated verification that the main app opens no network sockets
+            - Apple Speech is limited to English, Chinese, Japanese, and Korean, including both Simplified and Traditional Chinese
+            - Stopping capture now finalizes the latest volatile SpeechAnalyzer result instead of discarding the final words
+            - SpeechAnalyzer input preserves captured-audio timestamps through format conversion
+            - Settings activation now retries until the window is visible and active
+            - Added automated checks for supported languages and audio timestamps, plus manual stop-finalization QA
 
             This asset is ad-hoc signed because no Developer ID certificate is available in the release environment. See the README installation note if macOS quarantine blocks first launch.
-          files: dist/OST-0.2.1-macos-arm64.zip
+          files: dist/OST-0.2.2-macos-arm64.zip
           fail_on_unmatched_files: true

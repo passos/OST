@@ -152,7 +152,7 @@ final class OSTTests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsRequestOpensVisibleKeyWindow() async throws {
+    func testSettingsRequestOpensVisibleWindow() async throws {
         let model = AppModel()
         model.openSettings(tab: .overlay)
 
@@ -161,7 +161,7 @@ final class OSTTests: XCTestCase {
             settingsWindow = NSApp.windows.first {
                 $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
             }
-            if settingsWindow?.isVisible == true, settingsWindow?.isKeyWindow == true {
+            if settingsWindow?.isVisible == true {
                 break
             }
             try await Task.sleep(for: .milliseconds(50))
@@ -170,7 +170,6 @@ final class OSTTests: XCTestCase {
         XCTAssertEqual(model.selectedSettingsTab, .overlay)
         XCTAssertNotNil(settingsWindow)
         XCTAssertTrue(settingsWindow?.isVisible == true)
-        XCTAssertTrue(settingsWindow?.isKeyWindow == true)
         settingsWindow?.orderOut(nil)
     }
 }

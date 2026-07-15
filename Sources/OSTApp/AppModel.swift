@@ -159,9 +159,10 @@ final class AppModel: ObservableObject {
         } catch {
             captureState = .stopping
         }
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
+        let finalizingTranscriptionTask = transcriptionTask
         await activeTranscriptionProvider?.stop()
+        await finalizingTranscriptionTask?.value
+        transcriptionTask = nil
         activeTranscriptionProvider = nil
         await translationScheduler.cancelAll()
         await appleTranslation.cancelAll()

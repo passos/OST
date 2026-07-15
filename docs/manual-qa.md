@@ -1,4 +1,4 @@
-# OST 0.2.1 Manual QA
+# OST 0.2.2 Manual QA
 
 Use this checklist for a release candidate built on macOS 26 or later on Apple Silicon.
 
@@ -17,7 +17,7 @@ Use this checklist for a release candidate built on macOS 26 or later on Apple S
 - Run `script/test.sh` and confirm the Xcode unit tests pass.
 - Run `script/verify_privacy.sh --static`.
 - Build the Release configuration for `platform=macOS,arch=arm64`.
-- Verify `CFBundleShortVersionString` is `0.2.1` and `CFBundleVersion` is `3`.
+- Verify `CFBundleShortVersionString` is `0.2.2` and `CFBundleVersion` is `4`.
 - Verify the app and embedded XPC with `codesign --verify --deep --strict`.
 - Confirm the main app has no network client entitlement and the downloader XPC does.
 
@@ -35,6 +35,7 @@ Use this checklist for a release candidate built on macOS 26 or later on Apple S
 
 - Watch a video or join a meeting for at least 10 minutes.
 - Confirm current text updates without blank flashes or disappearing confirmed text.
+- Stop capture immediately after a short phrase and confirm its final words replace the volatile preview and remain visible.
 - Confirm an identical sentence is not duplicated when Apple returns cumulative/final results.
 - Confirm a deliberately repeated sentence later in time is preserved.
 - Confirm the current translation preview uses its reserved two lines and never covers confirmed translations.
@@ -56,6 +57,7 @@ Use this checklist for a release candidate built on macOS 26 or later on Apple S
 - Confirm the app display language defaults to English.
 - Switch the app UI among English, Chinese, Japanese, and Korean and confirm the menu, settings, and overlay guidance update immediately.
 - Confirm Apple Speech and Apple Translation remain the default providers.
+- Confirm Apple Speech offers English, Chinese, Japanese, and Korean only, with both Simplified and Traditional Chinese selectable.
 - Download one available MLX model, confirm progress/cancel/resume, then test **Show in Finder** and **Delete Downloaded Model**.
 - For MLX translation, confirm only translated text is displayed and prompt/prefix echoes are removed.
 - Edit the MLX translation prompt and restore the default prompt.
@@ -78,7 +80,7 @@ Use this checklist for a release candidate built on macOS 26 or later on Apple S
 
 ## Packaging
 
-- Extract `OST-0.2.1-macos-arm64.zip` to a clean directory.
+- Extract `OST-0.2.2-macos-arm64.zip` to a clean directory.
 - Confirm the executable is arm64 and the app contains `en`, `zh-Hans`, `ja`, and `ko` resources.
 - Re-run strict code-sign verification on the extracted app.
 - Launch the extracted app. If quarantine blocks the ad-hoc build, follow the README note and record the exact Gatekeeper message.
