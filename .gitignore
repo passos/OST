@@ -6,5 +6,5 @@ DerivedDataTests/
 /dist/
 *.xcuserstate
 xcuserdata/
-Models/
+/Models/
 *.mlmodelc

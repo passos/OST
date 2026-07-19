@@ -48,7 +48,7 @@ for key in NSAudioCaptureUsageDescription NSMicrophoneUsageDescription NSScreenC
   fi
 done
 
-if rg -q 'PCMChunk|TranscriptSegment|sourceText|translatedText|audio' \
+if /usr/bin/grep -Eq 'PCMChunk|TranscriptSegment|sourceText|translatedText|audio' \
   "$ROOT_DIR/Sources/OSTCore/XPC/ModelDownloaderXPC.swift"; then
   echo "XPC protocol source unexpectedly exposes user-content types." >&2
   exit 1
@@ -71,12 +71,12 @@ codesign -dvvv --entitlements - "$XPC"
 plutil -p "$APP/Contents/Info.plist"
 plutil -p "$XPC/Contents/Info.plist"
 
-if codesign -d --entitlements - "$APP" 2>&1 | rg -q 'com.apple.security.network.client'; then
+if codesign -d --entitlements - "$APP" 2>&1 | /usr/bin/grep -Eq 'com.apple.security.network.client'; then
   echo "Main app unexpectedly has outbound network entitlement." >&2
   exit 1
 fi
 
-if ! codesign -d --entitlements - "$XPC" 2>&1 | rg -q 'com.apple.security.network.client'; then
+if ! codesign -d --entitlements - "$XPC" 2>&1 | /usr/bin/grep -Eq 'com.apple.security.network.client'; then
   echo "Downloader XPC is missing outbound network entitlement." >&2
   exit 1
 fi
@@ -85,7 +85,7 @@ for key in \
   com.apple.security.device.audio-input \
   com.apple.security.personal-information.accessibility \
   com.apple.security.files.user-selected.read-write; do
-  if codesign -d --entitlements - "$XPC" 2>&1 | rg -q "$key"; then
+  if codesign -d --entitlements - "$XPC" 2>&1 | /usr/bin/grep -Eq "$key"; then
     echo "Signed downloader XPC unexpectedly contains $key." >&2
     exit 1
   fi
