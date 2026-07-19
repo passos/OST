@@ -41,7 +41,7 @@ jobs:
           echo "artifact_path=$artifact_path" >> "$GITHUB_OUTPUT"
 
       - name: Store workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-package-${{ github.sha }}
           path: ${{ steps.package.outputs.artifact_path }}
