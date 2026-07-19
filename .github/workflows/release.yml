@@ -1,57 +1,55 @@
-name: Publish Release Asset
+name: Build Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload the generated ZIP to the selected release tag
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify 0.2.2 artifact
+      - name: Validate publish ref
+        if: inputs.publish
         run: |
           set -euo pipefail
-          artifact="dist/OST-0.2.2-macos-arm64.zip"
-          test -s "$artifact"
-          sha256sum "$artifact"
-          unzip -t "$artifact"
-          unzip -Z1 "$artifact" | grep -Fxq 'OST.app/Contents/MacOS/OST'
-          ! unzip -Z1 "$artifact" | grep -Eq '(^__MACOSX/|(^|/)\._|(^|/)\.DS_Store$)'
-          rm -rf /tmp/ost-release-check
-          unzip -q "$artifact" -d /tmp/ost-release-check
-          python3 - <<'PY'
-          import plistlib
-          from pathlib import Path
+          test "$GITHUB_REF_TYPE" = tag
+          case "$GITHUB_REF_NAME" in
+            v*) ;;
+            *) echo "Publish runs must use a v* tag ref." >&2; exit 1 ;;
+          esac
 
-          plist = plistlib.loads(Path("/tmp/ost-release-check/OST.app/Contents/Info.plist").read_bytes())
-          assert plist["CFBundleIdentifier"] == "com.reserve.OST"
-          assert plist["CFBundleShortVersionString"] == "0.2.2"
-          assert plist["CFBundleVersion"] == "4"
-          assert plist["LSUIElement"] is True
-          PY
+      - name: Build and package
+        id: package
+        env:
+          OST_RELEASE_TAG: ${{ inputs.publish && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          script/package_release.sh
+          artifact_path="$(find "$PWD/.build/release" -maxdepth 1 -type f -name 'OST-*-macos-arm64.zip' -print -quit)"
+          test -n "$artifact_path"
+          echo "artifact_path=$artifact_path" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub release
+      - name: Store workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-${{ github.sha }}
+          path: ${{ steps.package.outputs.artifact_path }}
+          if-no-files-found: error
+
+      - name: Upload GitHub release asset
+        if: inputs.publish
         uses: softprops/action-gh-release@v2
         with:
-          name: v0.2.2
-          body: |
-            ## v0.2.2
-
-            This release improves Apple SpeechAnalyzer transcription reliability for macOS 26+ on Apple Silicon.
-
-            - Apple Speech is limited to English, Chinese, Japanese, and Korean, including both Simplified and Traditional Chinese
-            - Stopping capture now finalizes the latest volatile SpeechAnalyzer result instead of discarding the final words
-            - SpeechAnalyzer input preserves captured-audio timestamps through format conversion
-            - Settings activation now retries until the window is visible and active
-            - Added automated checks for supported languages and audio timestamps, plus manual stop-finalization QA
-
-            This asset is ad-hoc signed because no Developer ID certificate is available in the release environment. See the README installation note if macOS quarantine blocks first launch.
-          files: dist/OST-0.2.2-macos-arm64.zip
+          files: ${{ steps.package.outputs.artifact_path }}
           fail_on_unmatched_files: true

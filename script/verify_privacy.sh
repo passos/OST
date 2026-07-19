@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP="$ROOT_DIR/DerivedData/Build/Products/Debug/OST.app"
+APP="${OST_APP_BUNDLE:-$ROOT_DIR/DerivedData/Build/Products/Debug/OST.app}"
 XPC="$APP/Contents/XPCServices/OSTModelDownloaderXPC.xpc"
 MAIN_INFO="$ROOT_DIR/Xcode/OSTApp/Info.plist"
 MAIN_ENTITLEMENTS="$ROOT_DIR/Xcode/OSTApp/OSTApp.entitlements"
