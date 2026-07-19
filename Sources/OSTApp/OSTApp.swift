@@ -44,7 +44,12 @@ private struct SettingsSceneBridgeLabel: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Label("OST", systemImage: "captions.bubble")
+        Label {
+            Text("OST")
+        } icon: {
+            menuBarIcon
+                .renderingMode(.template)
+        }
             .onReceive(NotificationCenter.default.publisher(for: .ostOpenSettings)) { _ in
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
@@ -52,6 +57,14 @@ private struct SettingsSceneBridgeLabel: View {
                     await SettingsWindowPresenter.bringForward()
                 }
             }
+    }
+
+    private var menuBarIcon: Image {
+#if SWIFT_PACKAGE
+        Image("MenuBarIcon", bundle: .module)
+#else
+        Image("MenuBarIcon")
+#endif
     }
 }
 

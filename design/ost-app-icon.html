@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App Icon: OST</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #05080d;
+      --panel: #0c121b;
+      --panel-raised: #111a25;
+      --line: rgba(255, 255, 255, 0.09);
+      --text: #f4f7fb;
+      --muted: #94a2b5;
+      --cyan: #35e2de;
+      --blue: #4f91ff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 50% -10%, rgba(53, 226, 222, 0.12), transparent 34rem),
+        var(--page);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 64px 0 80px;
+    }
+
+    header {
+      max-width: 780px;
+      margin-bottom: 48px;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--cyan);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 18px;
+      font-size: clamp(38px, 7vw, 72px);
+      font-weight: 760;
+      letter-spacing: -0.055em;
+      line-height: 0.96;
+    }
+
+    .lead {
+      margin-bottom: 0;
+      color: #c6d0dd;
+      font-size: clamp(17px, 2vw, 21px);
+      line-height: 1.58;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(300px, 1.05fr) minmax(300px, 0.95fr);
+      gap: 24px;
+      margin-bottom: 56px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(17, 26, 37, 0.96), rgba(9, 14, 22, 0.96));
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+    }
+
+    .master-panel {
+      display: grid;
+      place-items: center;
+      min-height: 570px;
+      padding: clamp(28px, 5vw, 56px);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .master-panel::before {
+      position: absolute;
+      width: 62%;
+      aspect-ratio: 1;
+      border-radius: 999px;
+      background: rgba(53, 226, 222, 0.11);
+      filter: blur(80px);
+      content: "";
+    }
+
+    #master-icon {
+      position: relative;
+      display: block;
+      width: min(100%, 480px);
+      height: auto;
+      filter: drop-shadow(0 28px 28px rgba(0, 0, 0, 0.38));
+    }
+
+    .details-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 570px;
+      padding: clamp(28px, 5vw, 48px);
+    }
+
+    h2 {
+      margin-bottom: 18px;
+      font-size: 27px;
+      letter-spacing: -0.025em;
+    }
+
+    .philosophy p {
+      color: #b5c0ce;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .palette {
+      display: flex;
+      gap: 10px;
+      margin: 26px 0 32px;
+    }
+
+    .swatch {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .swatch-color {
+      height: 42px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+    }
+
+    .swatch-label {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 12px;
+      background: #172231;
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 650;
+      padding: 11px 15px;
+      transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+    }
+
+    button:hover {
+      border-color: rgba(53, 226, 222, 0.52);
+      background: #1b2b3b;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    .primary {
+      border-color: transparent;
+      background: linear-gradient(110deg, #24c9c9, #4f91ff);
+      color: #04121e;
+    }
+
+    .primary:hover {
+      border-color: transparent;
+      background: linear-gradient(110deg, #42e5df, #70a7ff);
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 0 0 20px;
+    }
+
+    .section-heading h2 {
+      margin-bottom: 4px;
+    }
+
+    .section-heading p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+      gap: 12px;
+      margin-bottom: 54px;
+    }
+
+    .preview-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 224px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(12, 18, 27, 0.82);
+    }
+
+    .preview-stage {
+      display: grid;
+      place-items: center;
+      height: 124px;
+      margin-bottom: 14px;
+      border-radius: 13px;
+      background:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.025) 75%),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.025) 75%);
+      background-position: 0 0, 8px 8px;
+      background-size: 16px 16px;
+    }
+
+    .preview-stage img {
+      display: block;
+      filter: drop-shadow(0 8px 11px rgba(0, 0, 0, 0.34));
+    }
+
+    .preview-meta {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .preview-size {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .preview-platform {
+      color: var(--cyan);
+      font-size: 10px;
+      font-weight: 720;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .preview-purpose {
+      flex: 1;
+      min-height: 34px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .preview-card button {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+
+    .test-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 32px;
+      padding: 24px 28px;
+    }
+
+    .test-copy h2 {
+      margin-bottom: 5px;
+      font-size: 20px;
+    }
+
+    .test-copy p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .test-icons {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: max-content;
+    }
+
+    .test-icons figure {
+      display: grid;
+      justify-items: center;
+      gap: 7px;
+      margin: 0;
+    }
+
+    .test-icons figcaption {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .silhouette {
+      filter: grayscale(1) brightness(0) invert(1);
+    }
+
+    footer {
+      margin-top: 30px;
+      color: #647184;
+      font-size: 11px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 24px, 620px);
+        padding-top: 40px;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .master-panel,
+      .details-panel {
+        min-height: auto;
+      }
+
+      .test-strip {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">App Icon System</p>
+      <h1>OST · Signal Ribbon</h1>
+      <p class="lead">들리는 소리가 읽을 수 있는 언어로 안정되는 순간. 하나의 연속된 리본과 A·가의 음각으로 온디바이스 받아쓰기와 번역을 표현합니다.</p>
+    </header>
+
+    <section class="workspace" aria-label="OST 앱 아이콘 마스터와 디자인 철학">
+      <div class="panel master-panel">
+        <svg id="master-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="icon-title icon-desc">
+          <title id="icon-title">OST Signal Ribbon 앱 아이콘</title>
+          <desc id="icon-desc">청록과 파란색의 연결된 리본 안에 A와 가가 음각으로 새겨진 앱 아이콘</desc>
+          <defs>
+            <linearGradient id="background-gradient" x1="120" y1="80" x2="912" y2="944" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#102c44"/>
+              <stop offset="0.46" stop-color="#0a1d30"/>
+              <stop offset="1" stop-color="#06111e"/>
+            </linearGradient>
+            <radialGradient id="background-glow" cx="0" cy="0" r="1" gradientTransform="translate(252 190) rotate(47) scale(720 688)" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#35e2de" stop-opacity="0.18"/>
+              <stop offset="0.64" stop-color="#2387d5" stop-opacity="0.05"/>
+              <stop offset="1" stop-color="#06111e" stop-opacity="0"/>
+            </radialGradient>
+            <linearGradient id="ribbon-gradient" x1="178" y1="240" x2="842" y2="784" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#35e2de"/>
+              <stop offset="0.46" stop-color="#29c9dc"/>
+              <stop offset="0.54" stop-color="#43aef3"/>
+              <stop offset="1" stop-color="#607dff"/>
+            </linearGradient>
+            <linearGradient id="ribbon-highlight" x1="218" y1="222" x2="780" y2="770" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#ffffff" stop-opacity="0.32"/>
+              <stop offset="0.42" stop-color="#ffffff" stop-opacity="0.08"/>
+              <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="ribbon-shadow" x="54" y="108" width="880" height="808" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+              <feDropShadow dx="0" dy="32" stdDeviation="32" flood-color="#000b17" flood-opacity="0.52"/>
+            </filter>
+            <clipPath id="ios-squircle">
+              <path d="M512 0C866 0 1024 158 1024 512S866 1024 512 1024 0 866 0 512 158 0 512 0Z"/>
+            </clipPath>
+          </defs>
+
+          <g clip-path="url(#ios-squircle)">
+            <rect width="1024" height="1024" fill="url(#background-gradient)"/>
+            <rect width="1024" height="1024" fill="url(#background-glow)"/>
+            <path d="M-84 828C118 696 300 658 476 686C680 718 812 840 1104 664V1104H-84Z" fill="#4f91ff" opacity="0.055"/>
+
+            <g filter="url(#ribbon-shadow)">
+              <path id="signal-ribbon" d="M290 178H432C520 178 592 250 592 338V370C592 422 634 464 686 464H734C822 464 894 536 894 624V686C894 774 822 846 734 846H592C504 846 432 774 432 686V654C432 602 390 560 338 560H290C202 560 130 488 130 400V338C130 250 202 178 290 178Z" fill="url(#ribbon-gradient)"/>
+              <path d="M290 202H432C506 202 568 264 568 338V370C568 436 620 488 686 488H734C808 488 870 550 870 624" fill="none" stroke="url(#ribbon-highlight)" stroke-linecap="round" stroke-width="20"/>
+            </g>
+
+            <!-- A: vector path, independent of installed fonts. -->
+            <path fill="#071624" fill-rule="evenodd" d="M338 270H396L504 488H438L417 442H317L296 488H230L338 270ZM367 338L339 395H395L367 338Z"/>
+
+            <!-- 가: vector geometry, independent of installed fonts. -->
+            <path fill="#071624" d="M526 554H688V688H630V612H526V554ZM726 536H784V596H842V654H784V734H726V536Z"/>
+
+            <path d="M96 182C226 58 422 12 590 48" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-opacity="0.055" stroke-width="22"/>
+          </g>
+        </svg>
+      </div>
+
+      <aside class="panel details-panel">
+        <div class="philosophy">
+          <p class="eyebrow">Icon Philosophy</p>
+          <h2>음성에서 자막으로</h2>
+          <p>리본의 위쪽 덩어리는 입력 언어를, 아래쪽 덩어리는 번역 언어를 뜻합니다. 중앙의 끊기지 않는 굴곡은 시스템 오디오가 사라지거나 깜빡이지 않는 자막으로 이어지는 OST의 핵심 경험을 시각화합니다.</p>
+          <p>A와 가는 작은 라벨이 아니라 리본을 파낸 구조입니다. 큰 크기에서는 다국어 변환을 명확히 설명하고, 작은 크기에서는 글자가 단순한 음각으로 축약되어도 비대칭 리본 실루엣이 식별성을 유지합니다.</p>
+
+          <div class="palette" aria-label="아이콘 색상 팔레트">
+            <div class="swatch">
+              <div class="swatch-color" style="background:#071624"></div>
+              <div class="swatch-label">Midnight<br>#071624</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background:#35e2de"></div>
+              <div class="swatch-label">Signal<br>#35E2DE</div>
+            </div>
+            <div class="swatch">
+              <div class="swatch-color" style="background:#607dff"></div>
+              <div class="swatch-label">Translation<br>#607DFF</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="primary" type="button" data-download-size="1024">1024 PNG 다운로드</button>
+          <button type="button" id="download-svg">SVG 마스터 다운로드</button>
+        </div>
+      </aside>
+    </section>
+
+    <section aria-labelledby="ios-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="ios-heading">iOS 크기 미리보기</h2>
+          <p>작은 크기는 실제 픽셀 크기로 표시됩니다.</p>
+        </div>
+      </div>
+      <div class="preview-grid" id="ios-grid"></div>
+    </section>
+
+    <section aria-labelledby="macos-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="macos-heading">macOS 추가 크기</h2>
+          <p>현재 OST 앱 번들에 사용할 수 있는 고유 크기입니다.</p>
+        </div>
+      </div>
+      <div class="preview-grid" id="macos-grid"></div>
+    </section>
+
+    <section class="panel test-strip" aria-labelledby="silhouette-heading">
+      <div class="test-copy">
+        <h2 id="silhouette-heading">실루엣 테스트</h2>
+        <p>색과 내부 글자가 약해져도 연결된 두 덩어리의 비대칭 외곽선이 남습니다.</p>
+      </div>
+      <div class="test-icons" id="test-icons"></div>
+    </section>
+
+    <footer>모든 미리보기와 다운로드는 이 파일에 포함된 SVG에서 브라우저가 직접 생성합니다. 외부 폰트·이미지·라이브러리를 사용하지 않습니다.</footer>
+  </main>
+
+  <script>
+    const iosSizes = [
+      { size: 1024, purpose: "App Store" },
+      { size: 180, purpose: "iPhone @3x" },
+      { size: 167, purpose: "iPad Pro @2x" },
+      { size: 152, purpose: "iPad @2x" },
+      { size: 120, purpose: "iPhone @2x" },
+      { size: 87, purpose: "Spotlight @3x" },
+      { size: 80, purpose: "Spotlight @2x" },
+      { size: 76, purpose: "iPad @1x" },
+      { size: 60, purpose: "iPhone @1x" },
+      { size: 58, purpose: "Settings @2x" },
+      { size: 40, purpose: "Spotlight @1x" },
+      { size: 29, purpose: "Settings @1x" },
+      { size: 20, purpose: "Notification @1x" }
+    ];
+
+    const macosSizes = [
+      { size: 512, purpose: "512×512 / 256×256 @2x" },
+      { size: 256, purpose: "256×256 / 128×128 @2x" },
+      { size: 128, purpose: "128×128" },
+      { size: 64, purpose: "32×32 @2x" },
+      { size: 32, purpose: "32×32 / 16×16 @2x" },
+      { size: 16, purpose: "16×16" }
+    ];
+
+    const masterIcon = document.getElementById("master-icon");
+
+    function svgMarkup(size) {
+      const clone = masterIcon.cloneNode(true);
+      clone.removeAttribute("id");
+      clone.setAttribute("width", size);
+      clone.setAttribute("height", size);
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      return new XMLSerializer().serializeToString(clone);
+    }
+
+    function svgDataUrl(size) {
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup(size))}`;
+    }
+
+    function makePreviewCard({ size, purpose }, platform) {
+      const card = document.createElement("article");
+      card.className = "preview-card";
+
+      const stage = document.createElement("div");
+      stage.className = "preview-stage";
+
+      const image = document.createElement("img");
+      const displaySize = Math.min(size, 112);
+      image.src = svgDataUrl(size);
+      image.width = displaySize;
+      image.height = displaySize;
+      image.alt = `${size}×${size} OST 앱 아이콘 미리보기`;
+      stage.appendChild(image);
+
+      const meta = document.createElement("div");
+      meta.className = "preview-meta";
+      meta.innerHTML = `<span class="preview-size">${size}×${size}</span><span class="preview-platform">${platform}</span>`;
+
+      const label = document.createElement("div");
+      label.className = "preview-purpose";
+      label.textContent = purpose;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.downloadSize = size;
+      button.textContent = "PNG 다운로드";
+
+      card.append(stage, meta, label, button);
+      return card;
+    }
+
+    function populateGrid(id, items, platform) {
+      const grid = document.getElementById(id);
+      items.forEach((item) => grid.appendChild(makePreviewCard(item, platform)));
+    }
+
+    async function downloadPng(size) {
+      const svg = svgMarkup(size);
+      const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      try {
+        const image = new Image();
+        const loaded = new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = reject;
+        });
+        image.src = url;
+        await loaded;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        context.clearRect(0, 0, size, size);
+        context.drawImage(image, 0, 0, size, size);
+
+        const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        triggerDownload(pngBlob, `OST-AppIcon-${size}.png`);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function downloadSvg() {
+      const blob = new Blob([svgMarkup(1024)], { type: "image/svg+xml;charset=utf-8" });
+      triggerDownload(blob, "OST-AppIcon-Master.svg");
+    }
+
+    function populateSilhouetteTest() {
+      const container = document.getElementById("test-icons");
+      [60, 29, 20].forEach((size) => {
+        const figure = document.createElement("figure");
+        const image = document.createElement("img");
+        image.className = "silhouette";
+        image.src = svgDataUrl(size);
+        image.width = size;
+        image.height = size;
+        image.alt = `${size}픽셀 흑백 실루엣`;
+        const caption = document.createElement("figcaption");
+        caption.textContent = `${size}px`;
+        figure.append(image, caption);
+        container.appendChild(figure);
+      });
+    }
+
+    populateGrid("ios-grid", iosSizes, "iOS");
+    populateGrid("macos-grid", macosSizes, "macOS");
+    populateSilhouetteTest();
+
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-download-size]");
+      if (button) downloadPng(Number(button.dataset.downloadSize));
+    });
+
+    document.getElementById("download-svg").addEventListener("click", downloadSvg);
+  </script>
+</body>
+</html>

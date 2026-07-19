@@ -47,6 +47,7 @@ let package = Package(
             name: "OSTApp",
             dependencies: ["OSTCore", "OSTPlatform", "OSTMLX"],
             resources: [
+                .process("Assets.xcassets"),
                 .process("en.lproj"),
                 .process("zh-Hans.lproj"),
                 .process("ja.lproj"),
