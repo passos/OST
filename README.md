@@ -1,6 +1,16 @@
+🇬🇧 English | [🇰🇷 한국어](README.ko.md) | [🇨🇳 中文](README.zh.md) | [🇯🇵 日本語](README.ja.md)
+
 # OST — On-Screen Translator
 
 OST is a menu bar app for macOS 26+ that transcribes system audio and shows on-device translation subtitles in a floating overlay. It is designed for videos and meetings, where disappearing, blinking, or duplicated text is a serious usability failure.
+
+## Screenshots
+
+### Combined overlay
+
+![OST combined transcription and translation overlay](assets/overlay-combined.png)
+
+### General settings
 
 ![OST General settings](assets/settings-general.png)
 

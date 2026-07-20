@@ -1,0 +1,83 @@
+[🇬🇧 English](README.md) | [🇰🇷 한국어](README.ko.md) | 🇨🇳 中文 | [🇯🇵 日本語](README.ja.md)
+
+# OST — On-Screen Translator
+
+OST 是一款适用于 macOS 26 及更高版本的菜单栏应用。它可以转录系统音频，并在浮动叠加窗口中显示本机翻译字幕。它专为视频和会议场景设计，因为在这些场景中，文本消失、闪烁或重复都会严重影响使用体验。
+
+## 屏幕截图
+
+### 组合叠加窗口
+
+![OST 转录和翻译组合叠加窗口](assets/overlay-combined.png)
+
+### 通用设置
+
+![OST 通用设置](assets/settings-general.png)
+
+## 主要特点
+
+- 默认使用 Apple Speech 和 Apple Translation 作为本机处理提供程序。
+- 当相应的系统区域设置可用时，Apple Speech 支持英语、中文（简体和繁体）、日语及韩语。
+- 可选的 Qwen3 ASR 和翻译模型通过 MLX 在本机运行。
+- 已确认的转录和翻译历史会持续显示，同时为当前预览分别保留两行。
+- 每个转录和翻译区域可显示 2–10 行已确认内容；更改此值时，窗口会相应调整大小。
+- 默认左对齐，也可选择居中或右对齐。
+- 原文、已确认的译文和当前翻译预览分别提供字体与颜色设置，并显示实时示例。
+- EPD 用作翻译的软边界，不会在每次停顿时强制新建一行可见文本。
+- 应用界面支持英语、中文、日语和韩语，默认语言为英语。
+- 可选择按会话保存转录和翻译文件。此功能默认关闭，文件只会保存到用户选择的文件夹。
+
+## 隐私
+
+音频、转录和翻译均在 Mac 上处理。OST 不具备将音频、转录、翻译、设置或已保存的会话文件上传或发送到计算机之外的功能。
+
+只有在用户选择下载 MLX 模型时才会使用互联网。沙盒化的下载器只接收模型文件，不会接收用户内容。
+
+## 系统要求
+
+- macOS 26.0 或更高版本
+- Apple Silicon
+
+## 安装 0.2.2
+
+从 [v0.2.2 发布页面](https://github.com/9bow/OST/releases/tag/v0.2.2)下载 `OST-0.2.2-macos-arm64.zip`，解压后将 `OST.app` 移至“应用程序”文件夹。
+
+由于发布环境中没有 Developer ID 证书，当前二进制文件使用临时签名。如果确认应用是从本仓库下载的，但 macOS 隔离机制仍提示无法验证或应用已损坏，请移除隔离属性：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/OST.app
+```
+
+发布工作流会公布发行版 ZIP 文件的 SHA-256，可使用以下命令进行比较：
+
+```bash
+shasum -a 256 OST-0.2.2-macos-arm64.zip
+```
+
+## 开始转录
+
+1. 启动 OST，并在 macOS 提示时允许系统音频捕获。
+2. 选择菜单栏中的 OST 字幕图标。
+3. 选择输入语言和目标语言，然后选择**开始**。
+4. 在**设置 > 叠加窗口**中解锁、移动或调整窗口大小，或者更改已确认内容的行数。
+
+## 可选的会话文件
+
+打开**设置 > 隐私**，启用**将每个会话保存为文本文件**，然后选择一个文件夹。从开始捕获到停止捕获的一个区间即为一个会话。OST 会分别创建带时间戳的转录文件和翻译文件。此选项默认关闭，并且绝不会保存音频。
+
+## 构建和测试
+
+本项目同时使用 SwiftPM 与 Xcode 应用/XPC 项目。
+
+```bash
+swift package --disable-sandbox resolve
+swift test --disable-sandbox --disable-automatic-resolution --jobs 4
+script/test.sh
+script/build_and_run.sh run
+```
+
+发布检查清单请参阅 [docs/manual-qa.md](docs/manual-qa.md)。
+
+## 许可证
+
+[MIT](LICENSE)
