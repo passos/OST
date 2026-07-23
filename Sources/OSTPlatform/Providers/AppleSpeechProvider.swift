@@ -37,7 +37,8 @@ public actor AppleSpeechProvider: TranscriptionProvider {
     private var inputConverter: AVAudioConverter?
     private var reservedLocale: Locale?
     private var feedTask: Task<Void, Never>?
-    private var completionTasks: [Task<Void, Never>] = []
+    private var analysisStartTask: Task<Void, Never>?
+    private var resultTask: Task<Void, Never>?
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
     private var resultIdentity = AppleSpeechResultIdentityTracker()
     private var sentenceSegmenter = ProgressiveSentenceSegmenter()
@@ -147,7 +148,6 @@ public actor AppleSpeechProvider: TranscriptionProvider {
         let analysisTask = Task {
             do {
                 try await analyzer.start(inputSequence: inputPair.stream)
-                try await analyzer.finalizeAndFinishThroughEndOfInput()
             } catch is CancellationError {
                 await analyzer.cancelAndFinishNow()
             } catch {
@@ -207,7 +207,8 @@ public actor AppleSpeechProvider: TranscriptionProvider {
             }
         }
         self.feedTask = feedTask
-        completionTasks = [analysisTask, resultTask]
+        analysisStartTask = analysisTask
+        self.resultTask = resultTask
         outputPair.continuation.onTermination = { termination in
             guard case .cancelled = termination else { return }
             analysisTask.cancel()
@@ -225,11 +226,20 @@ public actor AppleSpeechProvider: TranscriptionProvider {
             await feedTask.value
             self.feedTask = nil
         }
-        let tasksToAwait = completionTasks
-        for task in tasksToAwait { await task.value }
-        completionTasks.removeAll()
-        if tasksToAwait.isEmpty {
+        if let analysisStartTask {
+            await analysisStartTask.value
+            self.analysisStartTask = nil
+            do {
+                try await analyzer?.finalizeAndFinishThroughEndOfInput()
+            } catch {
+                await analyzer?.cancelAndFinishNow()
+            }
+        } else {
             await analyzer?.cancelAndFinishNow()
+        }
+        if let resultTask {
+            await resultTask.value
+            self.resultTask = nil
         }
         analyzer = nil
         transcriber = nil

@@ -56,8 +56,9 @@ rm -f "$ARCHIVE"
 )
 
 unzip -t "$ARCHIVE"
-unzip -Z1 "$ARCHIVE" | grep -Fxq 'OST.app/Contents/MacOS/OST'
-if unzip -Z1 "$ARCHIVE" | grep -Eq '(^__MACOSX/|(^|/)\._|(^|/)\.DS_Store$)'; then
+ARCHIVE_LISTING="$(unzip -Z1 "$ARCHIVE")"
+grep -Fxq 'OST.app/Contents/MacOS/OST' <<< "$ARCHIVE_LISTING"
+if grep -Eq '(^__MACOSX/|(^|/)\._|(^|/)\.DS_Store$)' <<< "$ARCHIVE_LISTING"; then
   echo "Release archive contains macOS metadata files." >&2
   exit 1
 fi
