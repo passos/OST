@@ -86,7 +86,7 @@
 		T00100000000000000000001 /* OST */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = L00100000000000000000002 /* Build configuration list for PBXNativeTarget "OST" */;
-			buildPhases = (S00100000000000000000001, H00100000000000000000001, R00100000000000000000001, E00100000000000000000001, );
+			buildPhases = (S00100000000000000000001, H00100000000000000000001, R00100000000000000000001, Z00100000000000000000001, E00100000000000000000001, );
 			buildRules = ();
 			dependencies = (Y00100000000000000000001, );
 			fileSystemSynchronizedGroups = (G00100000000000000000003, );
@@ -173,6 +173,20 @@
 		R00100000000000000000003 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		R00100000000000000000004 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		Z00100000000000000000001 /* Stage MLX Metal Library */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(BUILT_PRODUCTS_DIR)/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib", );
+			name = "Stage MLX Metal Library";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/mlx.metallib", );
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n/bin/ln -sfn \"../Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib\" \"$SCRIPT_OUTPUT_FILE_0\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		S00100000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };

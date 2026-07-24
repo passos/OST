@@ -38,6 +38,10 @@ if [[ ! -d "$APP_BUNDLE" ]]; then
   echo "Built app bundle was not found: $APP_BUNDLE" >&2
   exit 1
 fi
+if [[ ! -L "$APP_BUNDLE/Contents/MacOS/mlx.metallib" ]]; then
+  echo "MLX Metal library was not staged beside the app executable." >&2
+  exit 1
+fi
 
 "$ROOT_DIR/script/sign_adhoc.sh" "$APP_BUNDLE"
 OST_APP_BUNDLE="$APP_BUNDLE" "$ROOT_DIR/script/verify_privacy.sh"

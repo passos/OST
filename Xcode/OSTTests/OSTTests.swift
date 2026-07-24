@@ -11,6 +11,16 @@ final class OSTTests: XCTestCase {
         XCTAssertNoThrow(try catalog.validate())
     }
 
+    func testMLXMetalLibraryIsColocatedWithExecutable() throws {
+        let executable = try XCTUnwrap(Bundle.main.executableURL)
+        let metalLibrary = executable.deletingLastPathComponent().appending(path: "mlx.metallib")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: metalLibrary.path))
+        XCTAssertEqual(
+            try FileManager.default.destinationOfSymbolicLink(atPath: metalLibrary.path),
+            "../Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+        )
+    }
+
     func testMainPrivacyDefaults() {
         let snapshot = PreferencesSnapshot()
         XCTAssertFalse(snapshot.overlayLocked)
