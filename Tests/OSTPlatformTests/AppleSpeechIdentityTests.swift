@@ -1,6 +1,6 @@
-import CoreMedia
 import Foundation
 import OSTCore
+import Speech
 @testable import OSTPlatform
 import Testing
 
@@ -14,10 +14,21 @@ import Testing
     ])
 }
 
-@Test func appleSpeechAnalyzerTimePreservesTheCapturedAudioTimeline() {
-    let time = AppleSpeechProvider.analyzerTime(for: .seconds(12) + .milliseconds(345))
+@Test func appleSpeechAudioReadFailureIsClassifiedSeparately() {
+    let source = NSError(
+        domain: SFSpeechErrorDomain,
+        code: SFSpeechError.Code.audioReadFailed.rawValue
+    )
+    let mapped = AppleSpeechProvider.mapAnalysisError(source)
 
-    #expect(abs(CMTimeGetSeconds(time) - 12.345) < 0.000_001)
+    guard let providerError = mapped as? AppleSpeechProviderError else {
+        Issue.record("Expected an AppleSpeechProviderError")
+        return
+    }
+    guard case .audioReadFailed = providerError else {
+        Issue.record("Expected audioReadFailed")
+        return
+    }
 }
 
 @Test func appleSpeechStartTimeCorrectionKeepsTheActiveResultIdentity() {

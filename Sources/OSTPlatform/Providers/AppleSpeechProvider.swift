@@ -10,6 +10,7 @@ public enum AppleSpeechProviderError: Error, Sendable {
     case localeUnsupported(SupportedLanguage)
     case assetUnavailable(SupportedLanguage)
     case incompatibleAudioFormat
+    case audioReadFailed
     case notPrepared
 }
 
@@ -151,7 +152,7 @@ public actor AppleSpeechProvider: TranscriptionProvider {
             } catch is CancellationError {
                 await analyzer.cancelAndFinishNow()
             } catch {
-                outputPair.continuation.finish(throwing: error)
+                outputPair.continuation.finish(throwing: Self.mapAnalysisError(error))
             }
         }
         let feedTask = Task { [weak self] in
@@ -203,7 +204,7 @@ public actor AppleSpeechProvider: TranscriptionProvider {
                 }
                 outputPair.continuation.finish()
             } catch {
-                outputPair.continuation.finish(throwing: error)
+                outputPair.continuation.finish(throwing: Self.mapAnalysisError(error))
             }
         }
         self.feedTask = feedTask
@@ -277,9 +278,8 @@ public actor AppleSpeechProvider: TranscriptionProvider {
             }
         }
 
-        let bufferStartTime = Self.analyzerTime(for: chunk.startTime)
         guard let converter = inputConverter else {
-            return AnalyzerInput(buffer: sourceBuffer, bufferStartTime: bufferStartTime)
+            return AnalyzerInput(buffer: sourceBuffer)
         }
         let ratio = analyzerFormat.sampleRate / sourceFormat.sampleRate
         guard let destination = AVAudioPCMBuffer(
@@ -301,13 +301,16 @@ public actor AppleSpeechProvider: TranscriptionProvider {
         guard status != .error else {
             throw conversionError ?? AppleSpeechProviderError.incompatibleAudioFormat
         }
-        return AnalyzerInput(buffer: destination, bufferStartTime: bufferStartTime)
+        return AnalyzerInput(buffer: destination)
     }
 
-    static func analyzerTime(for duration: Duration) -> CMTime {
-        let components = duration.components
-        let seconds = Double(components.seconds) + Double(components.attoseconds) / 1e18
-        return CMTime(seconds: seconds, preferredTimescale: 1_000_000_000)
+    static func mapAnalysisError(_ error: Error) -> Error {
+        let cocoaError = error as NSError
+        if cocoaError.domain == SFSpeechErrorDomain,
+           cocoaError.code == SFSpeechError.Code.audioReadFailed.rawValue {
+            return AppleSpeechProviderError.audioReadFailed
+        }
+        return error
     }
 
     private func segmentID(for key: Int64, final: Bool) -> UUID {

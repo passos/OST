@@ -182,4 +182,15 @@ final class OSTTests: XCTestCase {
         XCTAssertTrue(settingsWindow?.isVisible == true)
         settingsWindow?.orderOut(nil)
     }
+
+    @MainActor
+    func testRepeatedTranslationPackRequestsKeepTheActiveConfiguration() {
+        let coordinator = TranslationPackCoordinator()
+        coordinator.request(source: .english, target: .korean) {}
+        let first = coordinator.configuration
+
+        coordinator.request(source: .english, target: .korean) {}
+
+        XCTAssertEqual(coordinator.configuration, first)
+    }
 }

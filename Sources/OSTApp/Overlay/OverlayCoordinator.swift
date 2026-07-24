@@ -1,6 +1,7 @@
 import AppKit
 import OSTCore
 import SwiftUI
+import Translation
 
 private final class OverlayObserverBag: @unchecked Sendable {
     private var observers: [NSObjectProtocol] = []
@@ -32,15 +33,21 @@ final class OverlayCoordinator {
 
     private let state: OverlayState
     private let preferences: PreferencesStore
+    private let translationPackCoordinator: TranslationPackCoordinator
     private var panels: [OverlayPanelKind: SubtitlePanel] = [:]
     private let observerBag = OverlayObserverBag()
     private var sizingSignature: SizingSignature
     private var appliedSizingSignatures: [OverlayPanelKind: SizingSignature] = [:]
     private(set) var isVisible = true
 
-    init(state: OverlayState, preferences: PreferencesStore) {
+    init(
+        state: OverlayState,
+        preferences: PreferencesStore,
+        translationPackCoordinator: TranslationPackCoordinator
+    ) {
         self.state = state
         self.preferences = preferences
+        self.translationPackCoordinator = translationPackCoordinator
         sizingSignature = SizingSignature(
             lineCount: preferences.overlayLineCount,
             sourceFontSize: preferences.sourceFontSize,
@@ -146,10 +153,11 @@ final class OverlayCoordinator {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.minSize = minimumSize(for: kind)
-        panel.contentView = NSHostingView(rootView: OverlayContentView(
+        panel.contentView = NSHostingView(rootView: TranslationTaskOverlayRoot(
             kind: kind,
             state: state,
-            preferences: preferences
+            preferences: preferences,
+            translationPackCoordinator: translationPackCoordinator
         ))
         panels[kind] = panel
         return panel
@@ -278,6 +286,33 @@ final class OverlayCoordinator {
         case .combined: "OSTCombinedOverlay.sizing.v3"
         case .source: "OSTSourceOverlay.sizing.v3"
         case .translation: "OSTTranslationOverlay.sizing.v3"
+        }
+    }
+}
+
+private struct TranslationTaskOverlayRoot: View {
+    let kind: OverlayPanelKind
+    @ObservedObject var state: OverlayState
+    @ObservedObject var preferences: PreferencesStore
+    @ObservedObject var translationPackCoordinator: TranslationPackCoordinator
+
+    var body: some View {
+        OverlayContentView(
+            kind: kind,
+            state: state,
+            preferences: preferences
+        )
+        .translationTask(hostedConfiguration) { session in
+            await translationPackCoordinator.prepare(using: session)
+        }
+    }
+
+    private var hostedConfiguration: TranslationSession.Configuration? {
+        switch (preferences.overlayLayout, kind) {
+        case (.combined, .combined), (.split, .source):
+            translationPackCoordinator.configuration
+        default:
+            nil
         }
     }
 }

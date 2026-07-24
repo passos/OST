@@ -21,6 +21,7 @@ final class TranslationPackCoordinator: ObservableObject {
     @Published var errorText: String?
 
     private var completion: (@MainActor @Sendable () async -> Void)?
+    private var requestedPair: (source: SupportedLanguage, target: SupportedLanguage)?
     var onFailure: (@MainActor @Sendable () -> Void)?
 
     func request(
@@ -30,6 +31,12 @@ final class TranslationPackCoordinator: ObservableObject {
     ) {
         self.completion = completion
         errorText = nil
+        if configuration != nil,
+           requestedPair?.source == source,
+           requestedPair?.target == target {
+            return
+        }
+        requestedPair = (source, target)
         if #available(macOS 26.4, *) {
             configuration = TranslationSession.Configuration(
                 source: source.locale.language,
@@ -48,12 +55,14 @@ final class TranslationPackCoordinator: ObservableObject {
         do {
             try await TranslationPreparationSession(session).prepare()
             configuration = nil
+            requestedPair = nil
             let callback = completion
             completion = nil
             await callback?()
         } catch {
             errorText = "번역 언어팩을 준비하지 못했습니다."
             configuration = nil
+            requestedPair = nil
             completion = nil
             onFailure?()
         }

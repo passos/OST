@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import Translation
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -24,9 +23,6 @@ struct OSTApp: App {
             MenuBarView(model: model)
         } label: {
             SettingsSceneBridgeLabel()
-                .translationTask(model.translationPackCoordinator.configuration) { session in
-                    await model.translationPackCoordinator.prepare(using: session)
-                }
         }
 
         Settings {

@@ -48,12 +48,17 @@ final class AppModel: ObservableObject {
     init() {
         let preferences = PreferencesStore()
         let overlayState = OverlayState()
+        let translationPackCoordinator = TranslationPackCoordinator()
         self.preferences = preferences
         self.overlayState = overlayState
         modelDownloader = ModelDownloaderClient()
-        translationPackCoordinator = TranslationPackCoordinator()
+        self.translationPackCoordinator = translationPackCoordinator
         modelCatalog = try! ModelCatalog.bundled()
-        overlayCoordinator = OverlayCoordinator(state: overlayState, preferences: preferences)
+        overlayCoordinator = OverlayCoordinator(
+            state: overlayState,
+            preferences: preferences,
+            translationPackCoordinator: translationPackCoordinator
+        )
         translationPackCoordinator.onFailure = { [weak overlayState, weak preferences] in
             let language = preferences?.appDisplayLanguage ?? .english
             overlayState?.statusText = AppCopy.text("Translation pack setup failed — showing transcript", language: language)
@@ -597,6 +602,7 @@ final class AppModel: ObservableObject {
             case .localeUnsupported(let language): return .unsupportedLanguage(language)
             case .assetUnavailable(let language): return .speechLanguagePackUnavailable(language)
             case .incompatibleAudioFormat: return .audioSystem("The transcription audio format is incompatible.")
+            case .audioReadFailed: return .audioSystem("Apple Speech could not read the audio stream.")
             case .notPrepared: return .modelLoadFailed
             }
         }
