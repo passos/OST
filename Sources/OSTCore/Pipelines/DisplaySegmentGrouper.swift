@@ -44,7 +44,9 @@ public enum DisplaySegmentGrouper {
         let second = second.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !first.isEmpty else { return second }
         guard !second.isEmpty else { return first }
-        let attachesToPrevious = ".,?!:;，。？！、".contains(second.first!)
+        let attachesToPrevious = second.first.map {
+            ".,?!:;，。？！、".contains($0)
+        } ?? false
         return first + (attachesToPrevious ? "" : " ") + second
     }
 

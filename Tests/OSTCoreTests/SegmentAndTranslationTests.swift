@@ -127,6 +127,19 @@ private actor TestTranslationProvider: TranslationProvider {
     #expect(visible.map(\.sourceText) == ["final-2", "final-3", "final-4", "current"])
 }
 
+@Test func visibleSegmentsHonorsANonpositiveLimit() async {
+    let store = SegmentStore()
+    _ = await store.merge(.segment(TranscriptSegment(
+        startTime: .zero,
+        language: .english,
+        sourceText: "current",
+        isFinal: false
+    )))
+
+    #expect(await store.visibleSegments(limit: 0).isEmpty)
+    #expect(await store.visibleSegments(limit: -1).isEmpty)
+}
+
 @Test func identicalFinalSegmentsAreDeduplicated() async {
     let store = SegmentStore()
     let first = TranscriptSegment(

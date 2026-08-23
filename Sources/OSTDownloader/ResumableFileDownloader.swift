@@ -1,7 +1,7 @@
 import Foundation
 import Synchronization
 
-public enum ResumableDownloadError: Error, Sendable {
+public enum ResumableDownloadError: Error, Sendable, Equatable {
     case responseRejected
     case temporaryFileMissing
 }
@@ -19,10 +19,10 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
     private final class Delegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
         private struct State {
             var continuation: CheckedContinuation<Void, Error>?
+            var completion: Result<Void, Error>?
             var task: URLSessionDownloadTask?
             var session: URLSession?
             var movedFile = false
-            var finished = false
         }
 
         private let destination: URL
@@ -49,11 +49,21 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
 
         func wait() async throws {
             try await withCheckedThrowingContinuation { continuation in
-                let task = state.withLock { state -> URLSessionDownloadTask? in
+                let values = state.withLock { state -> (
+                    task: URLSessionDownloadTask?,
+                    completion: Result<Void, Error>?
+                ) in
+                    if let completion = state.completion {
+                        return (nil, completion)
+                    }
                     state.continuation = continuation
-                    return state.task
+                    return (state.task, nil)
                 }
-                task?.resume()
+                if let completion = values.completion {
+                    continuation.resume(with: completion)
+                } else {
+                    values.task?.resume()
+                }
             }
         }
 
@@ -85,6 +95,10 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
             didFinishDownloadingTo location: URL
         ) {
             do {
+                guard let response = downloadTask.response as? HTTPURLResponse,
+                      (200..<300).contains(response.statusCode) else {
+                    throw ResumableDownloadError.responseRejected
+                }
                 try FileManager.default.createDirectory(
                     at: destination.deletingLastPathComponent(),
                     withIntermediateDirectories: true
@@ -113,7 +127,11 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
                     )
                     try? resumeData.write(to: resumeDataURL, options: .atomic)
                 }
-                finish(.failure(error))
+                let reportedError: Error = nsError.code == NSURLErrorCancelled
+                    && nsError.domain == NSURLErrorDomain
+                    ? CancellationError()
+                    : error
+                finish(.failure(reportedError))
             } else if state.withLock({ $0.movedFile }) {
                 try? FileManager.default.removeItem(at: resumeDataURL)
                 finish(.success(()))
@@ -124,8 +142,8 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
 
         private func finish(_ result: Result<Void, Error>) {
             let values = state.withLock { state -> (CheckedContinuation<Void, Error>?, URLSession?) in
-                guard !state.finished else { return (nil, nil) }
-                state.finished = true
+                guard state.completion == nil else { return (nil, nil) }
+                state.completion = result
                 let continuation = state.continuation
                 state.continuation = nil
                 let session = state.session
@@ -136,6 +154,22 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
             values.1?.finishTasksAndInvalidate()
             values.0?.resume(with: result)
         }
+    }
+
+    private let configuration: URLSessionConfiguration
+
+    public override init() {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        self.configuration = configuration
+        super.init()
+    }
+
+    init(configuration: URLSessionConfiguration) {
+        self.configuration = configuration
+        super.init()
     }
 
     public func download(
@@ -149,10 +183,6 @@ public final class ResumableFileDownloader: NSObject, FileDownloading, @unchecke
             resumeDataURL: resumeDataURL,
             progress: progress
         )
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        configuration.urlCache = nil
-        configuration.httpCookieStorage = nil
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         let task: URLSessionDownloadTask
         if let resumeData = try? Data(contentsOf: resumeDataURL), !resumeData.isEmpty {

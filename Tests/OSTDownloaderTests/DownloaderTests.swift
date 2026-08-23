@@ -1,7 +1,38 @@
 import Foundation
 import OSTCore
-import OSTDownloader
+@testable import OSTDownloader
 import Testing
+
+private final class StubResponseURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        let isSuccessful = url.lastPathComponent == "success.bin"
+        guard let response = HTTPURLResponse(
+            url: url,
+            statusCode: isSuccessful ? 200 : 404,
+            httpVersion: nil,
+            headerFields: nil
+        ) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(
+            self,
+            didLoad: Data((isSuccessful ? "fixture" : "not found").utf8)
+        )
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
 
 private actor FixtureDownloader: FileDownloading {
     let data: Data
@@ -92,6 +123,64 @@ private func waitForTerminalStatus(
     )
     #expect(throws: FileVerificationError.self) {
         try FileHashVerifier.verify(file, descriptor: descriptor)
+    }
+}
+
+@Test func resumableDownloaderRejectsHTTPErrorResponses() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [StubResponseURLProtocol.self]
+    let downloader = ResumableFileDownloader(configuration: configuration)
+    let destination = root.appending(path: "fixture.bin")
+    let requestURL = try #require(URL(string: "https://example.invalid/fixture.bin"))
+
+    await #expect(throws: ResumableDownloadError.responseRejected) {
+        try await downloader.download(
+            request: URLRequest(url: requestURL),
+            destination: destination,
+            resumeDataURL: root.appending(path: "fixture.resume")
+        ) { _, _ in }
+    }
+    #expect(!FileManager.default.fileExists(atPath: destination.path))
+}
+
+@Test func resumableDownloaderMovesSuccessfulHTTPResponses() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [StubResponseURLProtocol.self]
+    let downloader = ResumableFileDownloader(configuration: configuration)
+    let destination = root.appending(path: "fixture.bin")
+    let requestURL = try #require(URL(string: "https://example.invalid/success.bin"))
+
+    try await downloader.download(
+        request: URLRequest(url: requestURL),
+        destination: destination,
+        resumeDataURL: root.appending(path: "fixture.resume")
+    ) { _, _ in }
+
+    #expect(try Data(contentsOf: destination) == Data("fixture".utf8))
+}
+
+@Test func resumableDownloaderImmediateCancellationCompletes() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [StubResponseURLProtocol.self]
+    let downloader = ResumableFileDownloader(configuration: configuration)
+    let requestURL = try #require(URL(string: "https://example.invalid/fixture.bin"))
+    let task = Task {
+        try await downloader.download(
+            request: URLRequest(url: requestURL),
+            destination: root.appending(path: "fixture.bin"),
+            resumeDataURL: root.appending(path: "fixture.resume")
+        ) { _, _ in }
+    }
+
+    task.cancel()
+    await #expect(throws: CancellationError.self) {
+        try await task.value
     }
 }
 

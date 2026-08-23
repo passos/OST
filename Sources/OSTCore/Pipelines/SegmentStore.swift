@@ -63,6 +63,7 @@ public actor SegmentStore {
     }
 
     public func visibleSegments(limit: Int = 3) -> [TranscriptSegment] {
+        guard limit > 0 else { return [] }
         let finalizedTail = finalized.suffix(max(0, limit - (volatile == nil ? 0 : 1)))
         return Array(finalizedTail) + (volatile.map { [$0] } ?? [])
     }
@@ -101,7 +102,7 @@ public actor AutomaticLanguageStabilizer {
     public init() {}
 
     public func observe(_ detected: SupportedLanguage) -> SupportedLanguage {
-        if current == nil {
+        guard let current else {
             current = detected
             candidate = nil
             candidateCount = 0
@@ -110,7 +111,7 @@ public actor AutomaticLanguageStabilizer {
         if detected == current {
             candidate = nil
             candidateCount = 0
-            return current!
+            return current
         }
         if candidate == detected {
             candidateCount += 1
@@ -119,11 +120,12 @@ public actor AutomaticLanguageStabilizer {
             candidateCount = 1
         }
         if candidateCount >= 2 {
-            current = detected
+            self.current = detected
             candidate = nil
             candidateCount = 0
+            return detected
         }
-        return current!
+        return current
     }
 
     public func reset() {
