@@ -68,3 +68,80 @@ private let bounds = CGRect(x: 0, y: 0, width: 400, height: 200)
         #expect(bounds.contains(rect))
     }
 }
+
+// MARK: - Resize drag arithmetic
+
+private let start = CGRect(x: 100, y: 100, width: 400, height: 200)
+private let minimum = CGSize(width: 320, height: 96)
+
+/// Dragging the trailing edge moves only that edge; the origin must stay put.
+@Test func resizingTrailingEdgeKeepsTheOrigin() {
+    let frame = OverlayResizeGeometry.resizedFrame(
+        start, edge: .trailing, translation: CGSize(width: 50, height: 0), minimumSize: minimum
+    )
+    #expect(frame.origin == start.origin)
+    #expect(frame.width == 450)
+    #expect(frame.height == start.height)
+}
+
+/// Dragging the leading edge has to move the origin, or the window would jump.
+@Test func resizingLeadingEdgeMovesTheOrigin() {
+    let frame = OverlayResizeGeometry.resizedFrame(
+        start, edge: .leading, translation: CGSize(width: -50, height: 0), minimumSize: minimum
+    )
+    #expect(frame.minX == 50)
+    #expect(frame.width == 450)
+    #expect(frame.maxX == start.maxX)
+}
+
+@Test func resizingBottomEdgeMovesTheOrigin() {
+    let frame = OverlayResizeGeometry.resizedFrame(
+        start, edge: .bottom, translation: CGSize(width: 0, height: -30), minimumSize: minimum
+    )
+    #expect(frame.minY == 70)
+    #expect(frame.height == 230)
+    #expect(frame.maxY == start.maxY)
+}
+
+@Test func resizingACornerMovesBothAxes() {
+    let frame = OverlayResizeGeometry.resizedFrame(
+        start, edge: .bottomLeading, translation: CGSize(width: -20, height: -10), minimumSize: minimum
+    )
+    #expect(frame.minX == 80)
+    #expect(frame.minY == 90)
+    #expect(frame.width == 420)
+    #expect(frame.height == 210)
+}
+
+/// The minimum must clamp the size AND stop the far edge from walking, otherwise shrinking
+/// past the limit drags the whole window across the screen.
+@Test func resizingStopsAtTheMinimumWithoutMovingTheOppositeEdge() {
+    let frame = OverlayResizeGeometry.resizedFrame(
+        start, edge: .leading, translation: CGSize(width: 500, height: 0), minimumSize: minimum
+    )
+    #expect(frame.width == minimum.width)
+    #expect(frame.maxX == start.maxX, "the trailing edge must not move while dragging the leading one")
+}
+
+@Test func resizingStopsAtTheMinimumHeight() {
+    let frame = OverlayResizeGeometry.resizedFrame(
+        start, edge: .bottom, translation: CGSize(width: 0, height: 500), minimumSize: minimum
+    )
+    #expect(frame.height == minimum.height)
+    #expect(frame.maxY == start.maxY)
+}
+
+/// An edge drag must not change the other axis at all.
+@Test func resizingAnEdgeLeavesTheOtherAxisUntouched() {
+    let horizontal = OverlayResizeGeometry.resizedFrame(
+        start, edge: .trailing, translation: CGSize(width: 40, height: 999), minimumSize: minimum
+    )
+    #expect(horizontal.minY == start.minY)
+    #expect(horizontal.height == start.height)
+
+    let vertical = OverlayResizeGeometry.resizedFrame(
+        start, edge: .top, translation: CGSize(width: 999, height: 40), minimumSize: minimum
+    )
+    #expect(vertical.minX == start.minX)
+    #expect(vertical.width == start.width)
+}
