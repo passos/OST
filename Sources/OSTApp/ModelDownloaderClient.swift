@@ -22,6 +22,7 @@ final class ModelDownloaderClient: ObservableObject {
 
     private let connectionBox = XPCConnectionBox()
     private var pollingTasks: [String: Task<Void, Never>] = [:]
+    private var pollGeneration: [String: UInt64] = [:]
 
     deinit {
         connectionBox.invalidate()
@@ -102,8 +103,16 @@ final class ModelDownloaderClient: ObservableObject {
 
     private func poll(descriptor: ModelDescriptor, requestID: UUID) {
         pollingTasks[descriptor.id]?.cancel()
+        // Retire only our own handle: re-installing the same model replaces the task, and a
+        // finishing task's cleanup must not delete the newer poller's entry.
+        let generation = (pollGeneration[descriptor.id] ?? 0) &+ 1
+        pollGeneration[descriptor.id] = generation
         pollingTasks[descriptor.id] = Task { [weak self] in
-            defer { self?.pollingTasks[descriptor.id] = nil }
+            defer {
+                if self?.pollGeneration[descriptor.id] == generation {
+                    self?.pollingTasks[descriptor.id] = nil
+                }
+            }
             while !Task.isCancelled {
                 guard let self, let proxy = self.proxy() else { return }
                 let status = await withCheckedContinuation { continuation in

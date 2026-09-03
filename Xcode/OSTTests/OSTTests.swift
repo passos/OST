@@ -319,7 +319,7 @@ final class OSTTests: XCTestCase {
     }
 
     @MainActor
-    func testRepeatedIdenticalCaptureStatusInvalidatesTheMenuOnlyOnce() {
+    func testRepeatedIdenticalCaptureStatusDoesNotInvalidateTheMenu() {
         withPreservedStandardPreferences {
             let model = AppModel()
             model.overlayState.statusText = "Capturing"
@@ -339,6 +339,34 @@ final class OSTTests: XCTestCase {
             XCTAssertEqual(
                 republished, 0,
                 "re-assigning the same status and language must not invalidate the menu"
+            )
+
+            // Forward direction: de-duplicating must not mean the menu stops seeing values.
+            // Deleting the mirror sinks entirely would otherwise leave every assertion above
+            // satisfied while the menu froze at its initial text.
+            XCTAssertEqual(model.menuStatusText, "Capturing")
+            XCTAssertEqual(model.menuDetectedLanguage, .english)
+
+            model.overlayState.statusText = "Silence"
+            XCTAssertEqual(model.menuStatusText, "Silence", "a real status change must reach the menu")
+            XCTAssertEqual(republished, 1, "and it must invalidate the menu exactly once")
+        }
+    }
+
+    /// AppModel no longer forwards the downloader's changes, so SettingsView has to observe it
+    /// itself or the download rows silently stop updating — with no compiler error. Assert the
+    /// property wrapper structurally, since the rows themselves need a GUI to exercise.
+    @MainActor
+    func testSettingsViewObservesTheDownloaderItself() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            let view = SettingsView(model: model, downloader: model.modelDownloader)
+            let wrapper = Mirror(reflecting: view).children
+                .first { $0.label == "_downloader" }
+            XCTAssertNotNil(wrapper, "SettingsView must hold the downloader in a property wrapper")
+            XCTAssertTrue(
+                wrapper?.value is ObservedObject<ModelDownloaderClient>,
+                "SettingsView must observe ModelDownloaderClient directly, not through AppModel"
             )
         }
     }
