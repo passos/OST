@@ -253,6 +253,44 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
     #expect(decoded.sessionLogDirectoryPath == "/tmp/OST")
 }
 
+@Test func captureShortcutIsUnboundByDefault() {
+    #expect(PreferencesSnapshot().captureShortcut == nil)
+}
+
+@Test func olderPreferencesDecodeWithUnboundCaptureShortcut() throws {
+    let encoded = try JSONEncoder().encode(PreferencesSnapshot(
+        captureShortcut: CaptureShortcut(keyCode: 0x0B, modifiers: 0x000D_0000)
+    ))
+    var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    object.removeValue(forKey: "captureShortcut")
+
+    let decoded = try JSONDecoder().decode(
+        PreferencesSnapshot.self,
+        from: try JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded.captureShortcut == nil)
+}
+
+/// The hot key and the menu button share one decision, so the decision has to exist
+/// somewhere both can reach and a test can drive without a microphone.
+@Test func toggleIntentStartsFromRestingStates() {
+    #expect(CaptureState.idle.toggleIntent == .start)
+    #expect(CaptureState.failed(.permissionDenied).toggleIntent == .start)
+}
+
+@Test func toggleIntentStopsWhileCaptureIsComingUpOrRunning() {
+    #expect(CaptureState.running.toggleIntent == .stop)
+    // Pressing the hot key during start-up must cancel it, not queue a second start --
+    // otherwise a slow model load looks like a dead shortcut.
+    #expect(CaptureState.requestingPermission.toggleIntent == .stop)
+    #expect(CaptureState.preparingModels.toggleIntent == .stop)
+}
+
+@Test func toggleIntentDoesNothingWhileAlreadyStopping() {
+    #expect(CaptureState.stopping.toggleIntent == nil)
+}
+
 @Test func sessionLogWriterCreatesSeparateStableFiles() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appending(path: UUID().uuidString, directoryHint: .isDirectory)
