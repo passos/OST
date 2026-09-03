@@ -274,6 +274,76 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
 
 /// The hot key and the menu button share one decision, so the decision has to exist
 /// somewhere both can reach and a test can drive without a microphone.
+/// The overlay height came out of `fontSize * 1.25 * lines + 52` and a `maximumHeight * 0.9`
+/// cap, so almost every font size produced a fractional height. A window whose height lands
+/// on half a pixel puts all of its text on a half-pixel offset, which is the blur.
+@Test func overlaySizesAreWholePointsAtEveryFontSize() {
+    for size in stride(from: 12.0, through: 72.0, by: 1.0) {
+        for lines in 2...10 {
+            let combined = OverlaySizing.combinedSize(
+                lineCount: lines,
+                sourceFontSize: size,
+                translationFontSize: size,
+                previewFontSize: size,
+                maximumHeight: 1117
+            )
+            #expect(combined.height == combined.height.rounded(), "combined height \(combined.height) at \(size)pt")
+            #expect(combined.width == combined.width.rounded())
+
+            let source = OverlaySizing.sourceSize(lineCount: lines, fontSize: size, maximumHeight: 1117)
+            #expect(source.height == source.height.rounded(), "source height \(source.height) at \(size)pt")
+
+            let translation = OverlaySizing.translationSize(
+                lineCount: lines,
+                fontSize: size,
+                previewFontSize: size,
+                maximumHeight: 1117
+            )
+            #expect(translation.height == translation.height.rounded(), "translation height \(translation.height) at \(size)pt")
+        }
+    }
+}
+
+/// A restored frame is fed straight to setFrame, so a stored fractional origin reintroduces
+/// the same offset the sizing fix removes.
+@Test func restoredOverlayFramesAreWholePoints() {
+    let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    let frame = OverlayFrameRestorer.restoredFrame(
+        stored: CGRect(x: 100.4, y: 200.7, width: 720.3, height: 181.6),
+        visibleFrames: [screen],
+        primaryVisibleFrame: screen
+    )
+    #expect(frame.origin.x == frame.origin.x.rounded())
+    #expect(frame.origin.y == frame.origin.y.rounded())
+    #expect(frame.width == frame.width.rounded())
+    #expect(frame.height == frame.height.rounded())
+
+    let defaulted = OverlayFrameRestorer.restoredFrame(
+        stored: nil,
+        visibleFrames: [CGRect(x: 0, y: 0, width: 1365, height: 767)],
+        primaryVisibleFrame: CGRect(x: 0, y: 0, width: 1365, height: 767)
+    )
+    #expect(defaulted.origin.x == defaulted.origin.x.rounded())
+    #expect(defaulted.width == defaulted.width.rounded())
+}
+
+@Test func subtitleFontFamilyIsUnsetByDefault() {
+    #expect(PreferencesSnapshot().subtitleFontName == nil)
+}
+
+@Test func olderPreferencesDecodeWithoutASubtitleFontName() throws {
+    let encoded = try JSONEncoder().encode(PreferencesSnapshot(subtitleFontName: "Menlo"))
+    var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    object.removeValue(forKey: "subtitleFontName")
+
+    let decoded = try JSONDecoder().decode(
+        PreferencesSnapshot.self,
+        from: try JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded.subtitleFontName == nil)
+}
+
 @Test func repositionShortcutIsUnboundByDefault() {
     #expect(PreferencesSnapshot().repositionShortcut == nil)
 }

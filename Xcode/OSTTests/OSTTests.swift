@@ -899,4 +899,120 @@ final class OSTTests: XCTestCase {
         XCTAssertTrue(source.contains("model.toggleTemporaryReposition()"))
         XCTAssertTrue(source.contains("Finish Repositioning"))
     }
+
+    // MARK: - Subtitle rendering and font family (#3)
+
+    /// Rounding the computed size is not enough on its own: the frame that actually reaches
+    /// the window has to land on the backing grid, or the text sits on a half pixel again.
+    @MainActor
+    func testOverlayPanelFrameLandsOnTheBackingGrid() {
+        let suiteName = "OSTTests.pixel-align.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, preferences) = makeOverlayCoordinator(defaults)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let panel = combinedPanel(addedOver: before) else {
+            return XCTFail("the panel did not appear.")
+        }
+
+        for size in [13.0, 17.0, 23.0, 31.0, 47.0] {
+            preferences.sourceFontSize = size
+            preferences.translationFontSize = size
+            coordinator.applyPreferences()
+            let frame = panel.frame
+            XCTAssertEqual(
+                frame,
+                panel.backingAlignedRect(frame, options: .alignAllEdgesNearest),
+                "at \(size)pt the panel frame is off the backing grid"
+            )
+        }
+    }
+
+    /// Font.custom falls back silently when the family is missing, so a stale name from an
+    /// uninstalled font would look like the setting doing nothing.
+    func testAnUnavailableFontFamilyFallsBackToTheSystemFont() {
+        XCTAssertFalse(SubtitleFont.isAvailable("Definitely Not An Installed Family"))
+        XCTAssertEqual(
+            SubtitleFont.resolve(name: "Definitely Not An Installed Family", size: 20, weight: .regular),
+            Font.system(size: 20, weight: .regular)
+        )
+        XCTAssertEqual(
+            SubtitleFont.resolve(name: nil, size: 20, weight: .semibold),
+            Font.system(size: 20, weight: .semibold)
+        )
+    }
+
+    func testAnInstalledFontFamilyIsUsed() throws {
+        let family = try XCTUnwrap(
+            NSFontManager.shared.availableFontFamilies.first(where: { $0 == "Menlo" })
+                ?? NSFontManager.shared.availableFontFamilies.first
+        )
+        XCTAssertTrue(SubtitleFont.isAvailable(family))
+        XCTAssertNotEqual(
+            SubtitleFont.resolve(name: family, size: 20, weight: .regular),
+            Font.system(size: 20, weight: .regular)
+        )
+    }
+
+    @MainActor
+    func testSubtitleFontNameRoundTripsThroughPreferencesStore() {
+        let suiteName = "OSTTests.font-name.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = PreferencesStore(userDefaults: defaults)
+        first.subtitleFontName = "Menlo"
+        XCTAssertEqual(PreferencesStore(userDefaults: defaults).subtitleFontName, "Menlo")
+
+        first.subtitleFontName = nil
+        XCTAssertNil(PreferencesStore(userDefaults: defaults).subtitleFontName)
+    }
+
+    /// A fully opaque background has nothing to blend, and letting AppKit know restores
+    /// subpixel antialiasing instead of the greyscale pass a transparent window gets.
+    @MainActor
+    func testAFullyOpaqueOverlayTellsAppKitItIsOpaque() {
+        let suiteName = "OSTTests.opaque.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, preferences) = makeOverlayCoordinator(defaults)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        preferences.backgroundOpacity = 1
+        coordinator.show()
+        guard let panel = combinedPanel(addedOver: before) else {
+            return XCTFail("the panel did not appear.")
+        }
+        XCTAssertTrue(panel.isOpaque)
+
+        preferences.backgroundOpacity = 0.65
+        coordinator.applyPreferences()
+        XCTAssertFalse(panel.isOpaque, "a translucent overlay still has to blend")
+    }
+
+    /// A view modifier .opacity() forces an offscreen compositing pass, which is what puts
+    /// the faint second copy behind the older lines. Fading the colour does not.
+    func testFadedHistoryDoesNotUseAnOpacityLayer() throws {
+        let source = try String(
+            contentsOf: projectRoot.appending(path: "Sources/OSTApp/Overlay/OverlayContentView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertFalse(
+            source.contains(".opacity(entry.id =="),
+            "fade the text colour instead of compositing the row through a layer"
+        )
+    }
+
+    @MainActor
+    func testSettingsOffersAFontFamilyPicker() throws {
+        let source = try String(
+            contentsOf: projectRoot.appending(path: "Sources/OSTApp/SettingsView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("subtitleFontName"))
+    }
 }
