@@ -113,6 +113,11 @@ final class PreferencesStore: ObservableObject {
         set { snapshot.previewFontSize = min(max(newValue, 12), 72) }
     }
 
+    var subtitleFontName: String? {
+        get { snapshot.subtitleFontName }
+        set { snapshot.subtitleFontName = newValue }
+    }
+
     var sourceColor: RGBAColor {
         get { snapshot.sourceColor }
         set { snapshot.sourceColor = newValue }

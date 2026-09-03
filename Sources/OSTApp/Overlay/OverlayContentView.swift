@@ -82,9 +82,17 @@ struct OverlayContentView: View {
             segments: state.segments,
             track: .source,
             placeholder: t("Choose Start from the OST menu bar icon.\nTranscription results appear here."),
-            font: .system(size: preferences.sourceFontSize, weight: .regular),
+            font: SubtitleFont.resolve(
+                name: preferences.subtitleFontName,
+                size: CGFloat(preferences.sourceFontSize),
+                weight: .regular
+            ),
             foregroundColor: color(preferences.sourceColor),
-            liveFont: .system(size: preferences.sourceFontSize, weight: .regular),
+            liveFont: SubtitleFont.resolve(
+                name: preferences.subtitleFontName,
+                size: CGFloat(preferences.sourceFontSize),
+                weight: .regular
+            ),
             liveForegroundColor: color(preferences.sourceColor),
             alignment: preferences.subtitleAlignment,
             showsPlaceholder: !state.isListening
@@ -96,9 +104,17 @@ struct OverlayContentView: View {
             segments: state.segments,
             track: .translation,
             placeholder: t("Choose Start from the OST menu bar icon.\nTranslation results appear here."),
-            font: .system(size: preferences.translationFontSize, weight: .semibold),
+            font: SubtitleFont.resolve(
+                name: preferences.subtitleFontName,
+                size: CGFloat(preferences.translationFontSize),
+                weight: .semibold
+            ),
             foregroundColor: color(preferences.translationColor),
-            liveFont: .system(size: preferences.previewFontSize, weight: .semibold),
+            liveFont: SubtitleFont.resolve(
+                name: preferences.subtitleFontName,
+                size: CGFloat(preferences.previewFontSize),
+                weight: .semibold
+            ),
             liveForegroundColor: color(preferences.previewColor),
             alignment: preferences.subtitleAlignment,
             showsPlaceholder: !state.isListening
@@ -207,7 +223,7 @@ private struct LatestSubtitleView: View {
                         LazyVStack(alignment: alignment.horizontalAlignment, spacing: 5) {
                             ForEach(stableEntries) { entry in
                                 Text(entry.text)
-                                    .opacity(entry.id == stableEntries.last?.id ? 1 : 0.72)
+                                    .foregroundStyle(foregroundColor.opacity(entry.id == stableEntries.last?.id ? 1 : 0.72))
                                     .frame(maxWidth: .infinity, alignment: alignment.frameAlignment)
                             }
                             Color.clear

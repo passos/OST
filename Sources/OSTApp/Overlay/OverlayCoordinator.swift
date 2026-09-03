@@ -212,7 +212,6 @@ final class OverlayCoordinator {
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
-        panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.minSize = minimumSize(for: kind)
@@ -242,6 +241,9 @@ final class OverlayCoordinator {
         let resizeToPreferred = appliedSizingSignatures[kind] != sizingSignature
         let minimumSize = minimumSize(for: kind)
         panel.minSize = minimumSize
+        // A fully opaque background has nothing to blend, and saying so lets AppKit keep
+        // the better text rendering it reserves for opaque windows.
+        panel.isOpaque = preferences.backgroundOpacity >= 1
         panel.ignoresMouseEvents = effectiveLocked
         (panel.contentView as? SubtitleResizeHostView)?.setLocked(effectiveLocked)
         panel.isMovableByWindowBackground = !effectiveLocked
@@ -262,7 +264,10 @@ final class OverlayCoordinator {
             frame.size.height = resizeToPreferred
                 ? minimumSize.height
                 : max(frame.height, minimumSize.height)
-            panel.setFrame(frame, display: true)
+            panel.setFrame(
+                panel.backingAlignedRect(frame, options: .alignAllEdgesNearest),
+                display: true
+            )
         }
         clamp(panel)
         appliedSizingSignatures[kind] = sizingSignature
@@ -283,7 +288,12 @@ final class OverlayCoordinator {
             primaryVisibleFrame: primary,
             defaultSize: panel.frame.size
         )
-        panel.setFrame(frame, display: true)
+        // Whole points are not enough on a Retina display: a frame has to land on the
+        // backing grid or every glyph inside it renders half a pixel off, which is the blur.
+        panel.setFrame(
+            panel.backingAlignedRect(frame, options: .alignAllEdgesNearest),
+            display: true
+        )
     }
 
     private func defaultFrame(for kind: OverlayPanelKind) -> NSRect {

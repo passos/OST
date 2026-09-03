@@ -303,6 +303,21 @@ struct SettingsView: View {
 
     private var appearanceTab: some View {
         Form {
+            Section(t("Font")) {
+                Picker(t("Subtitle font"), selection: subtitleFontNameBinding) {
+                    Text(t("System font")).tag(String?.none)
+                    ForEach(installedFontFamilies, id: \.self) { family in
+                        Text(family).tag(String?.some(family))
+                    }
+                }
+                if let name = model.preferences.subtitleFontName, !SubtitleFont.isAvailable(name) {
+                    // Font.custom falls back without a word, so an uninstalled family would
+                    // otherwise look like the setting simply doing nothing.
+                    Text(t("That font is not installed. Subtitles use the system font."))
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
             Section(t("Source transcript")) {
                 Text(t("Applies to confirmed transcript history and the two-line current transcription preview below it."))
                     .font(.caption)
@@ -466,7 +481,11 @@ struct SettingsView: View {
         foregroundColor: RGBAColor
     ) -> some View {
         Text(text)
-            .font(.system(size: fontSize, weight: weight))
+            .font(SubtitleFont.resolve(
+                name: model.preferences.subtitleFontName,
+                size: CGFloat(fontSize),
+                weight: weight
+            ))
             .foregroundStyle(swiftUIColor(foregroundColor))
             .multilineTextAlignment(previewTextAlignment)
             .lineLimit(2)
@@ -818,6 +837,14 @@ struct SettingsView: View {
     }
     private var previewFontSizeBinding: Binding<Double> {
         Binding(get: { model.preferences.previewFontSize }, set: { model.preferences.previewFontSize = $0 })
+    }
+    private var subtitleFontNameBinding: Binding<String?> {
+        Binding(get: { model.preferences.subtitleFontName }, set: { model.preferences.subtitleFontName = $0 })
+    }
+    /// Families, not faces: the picker offers "Helvetica Neue", not each of its weights,
+    /// which the size and weight settings already control.
+    private var installedFontFamilies: [String] {
+        NSFontManager.shared.availableFontFamilies.sorted()
     }
     private var backgroundOpacityBinding: Binding<Double> {
         Binding(get: { model.preferences.backgroundOpacity }, set: { model.preferences.backgroundOpacity = $0 })

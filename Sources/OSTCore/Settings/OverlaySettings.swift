@@ -117,6 +117,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var sessionLogDirectoryPath: String?
     public var captureShortcut: CaptureShortcut?
     public var repositionShortcut: CaptureShortcut?
+    public var subtitleFontName: String?
 
     public init(
         sourceMode: SourceLanguageMode = .fixed(.english),
@@ -146,7 +147,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         sessionLogDirectoryBookmark: Data? = nil,
         sessionLogDirectoryPath: String? = nil,
         captureShortcut: CaptureShortcut? = nil,
-        repositionShortcut: CaptureShortcut? = nil
+        repositionShortcut: CaptureShortcut? = nil,
+        subtitleFontName: String? = nil
     ) {
         self.sourceMode = sourceMode
         self.targetLanguage = targetLanguage
@@ -176,6 +178,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         self.sessionLogDirectoryPath = sessionLogDirectoryPath
         self.captureShortcut = captureShortcut
         self.repositionShortcut = repositionShortcut
+        self.subtitleFontName = subtitleFontName
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -207,6 +210,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         case sessionLogDirectoryPath
         case captureShortcut
         case repositionShortcut
+        case subtitleFontName
     }
 
     public init(from decoder: Decoder) throws {
@@ -241,7 +245,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
             sessionLogDirectoryBookmark: try values.decodeIfPresent(Data.self, forKey: .sessionLogDirectoryBookmark),
             sessionLogDirectoryPath: try values.decodeIfPresent(String.self, forKey: .sessionLogDirectoryPath),
             captureShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .captureShortcut),
-            repositionShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .repositionShortcut)
+            repositionShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .repositionShortcut),
+            subtitleFontName: try values.decodeIfPresent(String.self, forKey: .subtitleFontName)
         )
     }
 }
@@ -290,7 +295,7 @@ public enum OverlaySizing {
     }
 
     private static func cappedHeight(_ requestedHeight: Double, maximumHeight: Double) -> Double {
-        min(max(requestedHeight, 96), max(maximumHeight * 0.9, 96))
+        min(max(requestedHeight, 96), max(maximumHeight * 0.9, 96)).rounded()
     }
 }
 
@@ -305,21 +310,21 @@ public enum OverlayFrameRestorer {
         if let stored, let screen = screens.first(where: { $0.intersects(stored.insetBy(dx: 32, dy: 32)) }) {
             return clamp(stored, to: screen)
         }
-        let width = min(max(defaultSize.width, 320), primaryVisibleFrame.width * 0.9)
-        let height = min(max(defaultSize.height, 96), primaryVisibleFrame.height)
+        let width = min(max(defaultSize.width, 320), primaryVisibleFrame.width * 0.9).rounded()
+        let height = min(max(defaultSize.height, 96), primaryVisibleFrame.height).rounded()
         return CGRect(
-            x: primaryVisibleFrame.midX - width / 2,
-            y: primaryVisibleFrame.minY + 48,
+            x: (primaryVisibleFrame.midX - width / 2).rounded(),
+            y: (primaryVisibleFrame.minY + 48).rounded(),
             width: width,
             height: height
         )
     }
 
     public static func clamp(_ frame: CGRect, to visibleFrame: CGRect) -> CGRect {
-        let width = min(max(frame.width, 320), visibleFrame.width * 0.9)
-        let height = min(max(frame.height, 96), visibleFrame.height)
-        let x = min(max(frame.minX, visibleFrame.minX), visibleFrame.maxX - width)
-        let y = min(max(frame.minY, visibleFrame.minY), visibleFrame.maxY - height)
+        let width = min(max(frame.width, 320), visibleFrame.width * 0.9).rounded()
+        let height = min(max(frame.height, 96), visibleFrame.height).rounded()
+        let x = min(max(frame.minX, visibleFrame.minX), visibleFrame.maxX - width).rounded()
+        let y = min(max(frame.minY, visibleFrame.minY), visibleFrame.maxY - height).rounded()
         return CGRect(x: x, y: y, width: width, height: height)
     }
 }

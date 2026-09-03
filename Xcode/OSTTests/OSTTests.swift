@@ -1001,9 +1001,16 @@ final class OSTTests: XCTestCase {
             contentsOf: projectRoot.appending(path: "Sources/OSTApp/Overlay/OverlayContentView.swift"),
             encoding: .utf8
         )
-        XCTAssertFalse(
-            source.contains(".opacity(entry.id =="),
-            "fade the text colour instead of compositing the row through a layer"
+        // A bare `.opacity(...)` in the modifier chain is the offscreen pass. The same call
+        // spelled on a Color inside foregroundStyle is not, so the check is anchored to a
+        // line beginning rather than to the substring, which cannot tell them apart.
+        let modifierFade = source
+            .split(separator: "\n")
+            .contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix(".opacity(entry.id") }
+        XCTAssertFalse(modifierFade, "fade the text colour instead of compositing the row")
+        XCTAssertTrue(
+            source.contains("foregroundStyle(foregroundColor.opacity(entry.id"),
+            "the fade has to ride on the colour that is already being applied"
         )
     }
 
