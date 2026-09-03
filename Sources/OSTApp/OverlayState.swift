@@ -8,6 +8,7 @@ final class OverlayState: ObservableObject {
     @Published var statusText = "Waiting"
     @Published var detectedLanguage: SupportedLanguage?
     @Published var isListening = false
+    @Published var isRepositioning = false
 
     func clear() {
         segments.removeAll()

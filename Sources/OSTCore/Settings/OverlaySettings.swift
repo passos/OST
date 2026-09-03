@@ -116,6 +116,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var sessionLogDirectoryBookmark: Data?
     public var sessionLogDirectoryPath: String?
     public var captureShortcut: CaptureShortcut?
+    public var repositionShortcut: CaptureShortcut?
 
     public init(
         sourceMode: SourceLanguageMode = .fixed(.english),
@@ -144,7 +145,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         sessionLoggingEnabled: Bool = false,
         sessionLogDirectoryBookmark: Data? = nil,
         sessionLogDirectoryPath: String? = nil,
-        captureShortcut: CaptureShortcut? = nil
+        captureShortcut: CaptureShortcut? = nil,
+        repositionShortcut: CaptureShortcut? = nil
     ) {
         self.sourceMode = sourceMode
         self.targetLanguage = targetLanguage
@@ -173,6 +175,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         self.sessionLogDirectoryBookmark = sessionLogDirectoryBookmark
         self.sessionLogDirectoryPath = sessionLogDirectoryPath
         self.captureShortcut = captureShortcut
+        self.repositionShortcut = repositionShortcut
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -203,6 +206,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         case sessionLogDirectoryBookmark
         case sessionLogDirectoryPath
         case captureShortcut
+        case repositionShortcut
     }
 
     public init(from decoder: Decoder) throws {
@@ -236,7 +240,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
             sessionLoggingEnabled: try values.decodeIfPresent(Bool.self, forKey: .sessionLoggingEnabled) ?? false,
             sessionLogDirectoryBookmark: try values.decodeIfPresent(Data.self, forKey: .sessionLogDirectoryBookmark),
             sessionLogDirectoryPath: try values.decodeIfPresent(String.self, forKey: .sessionLogDirectoryPath),
-            captureShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .captureShortcut)
+            captureShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .captureShortcut),
+            repositionShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .repositionShortcut)
         )
     }
 }

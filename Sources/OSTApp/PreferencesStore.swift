@@ -178,6 +178,11 @@ final class PreferencesStore: ObservableObject {
         set { snapshot.captureShortcut = newValue }
     }
 
+    var repositionShortcut: CaptureShortcut? {
+        get { snapshot.repositionShortcut }
+        set { snapshot.repositionShortcut = newValue }
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(snapshot) {
             userDefaults.set(data, forKey: Self.storageKey)

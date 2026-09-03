@@ -862,6 +862,9 @@ final class OSTTests: XCTestCase {
             contentsOf: projectRoot.appending(path: "Sources/OSTApp/MenuBarView.swift"),
             encoding: .utf8
         )
-        XCTAssertTrue(source.contains("beginTemporaryReposition"))
+        // One entry that both enters and leaves the mode: entering from the menu and then
+        // having to wait out the timeout to leave is the same trap as no exit at all.
+        XCTAssertTrue(source.contains("model.toggleTemporaryReposition()"))
+        XCTAssertTrue(source.contains("Finish Repositioning"))
     }
 }

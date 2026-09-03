@@ -54,6 +54,12 @@ struct MenuBarView: View {
             Button(model.preferences.overlayLocked ? t("Unlock Overlay") : t("Lock Overlay")) {
                 model.toggleOverlayLock()
             }
+            Button(model.menuOverlayIsRepositioning
+                ? t("Finish Repositioning")
+                : t("Reposition Overlay")) {
+                model.toggleTemporaryReposition()
+            }
+            .disabled(!model.canTemporarilyRepositionOverlay && !model.menuOverlayIsRepositioning)
 
             Button(t("Restart Capture")) {
                 Task { await model.restartCapture() }

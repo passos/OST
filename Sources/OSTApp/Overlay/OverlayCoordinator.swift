@@ -40,15 +40,24 @@ final class OverlayCoordinator {
     private var appliedSizingSignatures: [OverlayPanelKind: SizingSignature] = [:]
     private(set) var isVisible = true
     private var appliedScreenCaptureHiding: Bool?
+    private(set) var isTemporarilyRepositioning = false
+    private let temporaryRepositionTimeout: Duration
+    private var temporaryRepositionTask: Task<Void, Never>?
+
+    private var effectiveLocked: Bool {
+        preferences.overlayLocked && !isTemporarilyRepositioning
+    }
 
     init(
         state: OverlayState,
         preferences: PreferencesStore,
-        translationPackCoordinator: TranslationPackCoordinator
+        translationPackCoordinator: TranslationPackCoordinator,
+        temporaryRepositionTimeout: Duration = .seconds(30)
     ) {
         self.state = state
         self.preferences = preferences
         self.translationPackCoordinator = translationPackCoordinator
+        self.temporaryRepositionTimeout = temporaryRepositionTimeout
         sizingSignature = SizingSignature(
             lineCount: preferences.overlayLineCount,
             sourceFontSize: preferences.sourceFontSize,
@@ -71,6 +80,7 @@ final class OverlayCoordinator {
     }
 
     deinit {
+        temporaryRepositionTask?.cancel()
         observerBag.invalidate()
     }
 
@@ -81,6 +91,10 @@ final class OverlayCoordinator {
 
     func hide() {
         isVisible = false
+        temporaryRepositionTask?.cancel()
+        temporaryRepositionTask = nil
+        isTemporarilyRepositioning = false
+        state.isRepositioning = false
         panels.values.forEach { $0.orderOut(nil) }
     }
 
@@ -142,10 +156,35 @@ final class OverlayCoordinator {
         applyPreferences()
     }
 
+    func beginTemporaryReposition() {
+        guard preferences.overlayLocked, isVisible else { return }
+        temporaryRepositionTask?.cancel()
+        isTemporarilyRepositioning = true
+        state.isRepositioning = true
+        applyPreferences()
+        temporaryRepositionTask = Task { [weak self, temporaryRepositionTimeout] in
+            do {
+                try await Task.sleep(for: temporaryRepositionTimeout)
+            } catch {
+                return
+            }
+            self?.endTemporaryReposition()
+        }
+    }
+
+    func endTemporaryReposition() {
+        temporaryRepositionTask?.cancel()
+        temporaryRepositionTask = nil
+        guard isTemporarilyRepositioning || state.isRepositioning else { return }
+        isTemporarilyRepositioning = false
+        state.isRepositioning = false
+        applyPreferences()
+    }
+
     private func panel(for kind: OverlayPanelKind) -> SubtitlePanel {
         if let panel = panels[kind] { return panel }
         var style: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
-        if !preferences.overlayLocked { style.insert(.resizable) }
+        if !effectiveLocked { style.insert(.resizable) }
         let panel = SubtitlePanel(
             contentRect: defaultFrame(for: kind),
             styleMask: style,
@@ -176,7 +215,7 @@ final class OverlayCoordinator {
                 preferences: preferences,
                 translationPackCoordinator: translationPackCoordinator
             )),
-            isLocked: preferences.overlayLocked
+            isLocked: effectiveLocked
         )
         panels[kind] = panel
         return panel
@@ -190,10 +229,10 @@ final class OverlayCoordinator {
         let resizeToPreferred = appliedSizingSignatures[kind] != sizingSignature
         let minimumSize = minimumSize(for: kind)
         panel.minSize = minimumSize
-        panel.ignoresMouseEvents = preferences.overlayLocked
-        (panel.contentView as? SubtitleResizeHostView)?.setLocked(preferences.overlayLocked)
-        panel.isMovableByWindowBackground = !preferences.overlayLocked
-        if preferences.overlayLocked {
+        panel.ignoresMouseEvents = effectiveLocked
+        (panel.contentView as? SubtitleResizeHostView)?.setLocked(effectiveLocked)
+        panel.isMovableByWindowBackground = !effectiveLocked
+        if effectiveLocked {
             panel.styleMask.remove(.resizable)
         } else {
             panel.styleMask.insert(.resizable)
