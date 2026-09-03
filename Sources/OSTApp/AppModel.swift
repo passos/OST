@@ -18,6 +18,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var appleSpeechSupportedLanguages: Set<SupportedLanguage> = []
     @Published var selectedSettingsTab: SettingsTab = .general
     @Published private(set) var sessionLoggingError: String?
+    /// Menu-only mirrors of the two overlay values MenuBarView renders. Kept separate
+    /// from OverlayState so the menu does not rebuild on segment churn.
+    @Published private(set) var menuStatusText = "Waiting"
+    @Published private(set) var menuDetectedLanguage: SupportedLanguage?
 
     private let registry = ProviderRegistry()
     private let stateMachine = CaptureStateMachine()
@@ -72,18 +76,25 @@ final class AppModel: ObservableObject {
                 )
             }
         }
+        // The menu renders preference-derived labels, so preferences keep invalidating it.
         preferences.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
-        overlayState.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-        modelDownloader.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-        translationPackCoordinator.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
+        // overlayState, modelDownloader and translationPackCoordinator are deliberately NOT
+        // forwarded. Download progress lands every 500ms and segments change at speech rate,
+        // and the menu shows neither; forwarding them rebuilt the whole MenuBarExtra tree —
+        // which, for an open NSMenu, is the flicker and truncation users reported.
+        // Views that need those objects observe them directly (SettingsView, OverlayContentView).
+        // The two values the menu does read are mirrored below, de-duplicated at the source
+        // because handleTranscript reassigns them on every transcript event.
+        overlayState.$statusText
+            .removeDuplicates()
+            .sink { [weak self] text in self?.menuStatusText = text }
+            .store(in: &cancellables)
+        overlayState.$detectedLanguage
+            .removeDuplicates()
+            .sink { [weak self] language in self?.menuDetectedLanguage = language }
+            .store(in: &cancellables)
     }
 
     func activate() async {

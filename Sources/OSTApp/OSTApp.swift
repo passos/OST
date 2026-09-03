@@ -26,7 +26,7 @@ struct OSTApp: App {
         }
 
         Settings {
-            SettingsView(model: model)
+            SettingsView(model: model, downloader: model.modelDownloader)
                 .environment(\.locale, Locale(identifier: model.preferences.appDisplayLanguage.localeIdentifier))
         }
     }

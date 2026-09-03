@@ -237,4 +237,137 @@ final class OSTTests: XCTestCase {
         XCTAssertNotIdentical(shared, hidden, "the panel must be rebuilt, not mutated in place")
         XCTAssertEqual(shared.sharingType, .readOnly, "turning the preference off must restore the default sharing type")
     }
+
+    // MARK: - Menu invalidation scope (#1)
+
+    /// AppModel.init() builds a PreferencesStore on UserDefaults.standard, so any test that
+    /// mutates preferences would overwrite the developer's real settings. Snapshot and restore.
+    @MainActor
+    private func withPreservedStandardPreferences(_ body: () throws -> Void) rethrows {
+        let key = "OST.preferences.v1"
+        let saved = UserDefaults.standard.data(forKey: key)
+        defer {
+            if let saved {
+                UserDefaults.standard.set(saved, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        try body()
+    }
+
+    @MainActor
+    func testDownloadProgressDoesNotInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            model.modelDownloader.statusByModelID["mlx-community/model"] = ModelDownloadStatus(
+                requestID: UUID(),
+                modelID: "mlx-community/model",
+                revision: String(repeating: "a", count: 40),
+                phase: .downloading,
+                completedBytes: 1,
+                totalBytes: 100
+            )
+
+            XCTAssertEqual(
+                republished, 0,
+                "download progress arrives every 500ms and the menu shows none of it, so it must not invalidate AppModel"
+            )
+        }
+    }
+
+    @MainActor
+    func testTranscriptSegmentChurnDoesNotInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            model.overlayState.segments = []
+            model.overlayState.segments = []
+
+            XCTAssertEqual(
+                republished, 0,
+                "segments change at speech rate and the menu never reads them, so they must not invalidate AppModel"
+            )
+        }
+    }
+
+    /// Guards against "fix" the flicker by deleting every forward: the menu really does read
+    /// preferences, so that one must keep invalidating AppModel.
+    @MainActor
+    func testPreferenceChangesStillInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            model.preferences.targetLanguage =
+                model.preferences.targetLanguage == .korean ? .english : .korean
+
+            XCTAssertGreaterThan(
+                republished, 0,
+                "the menu renders preference-derived labels, so preference changes must still invalidate it"
+            )
+        }
+    }
+
+    @MainActor
+    func testRepeatedIdenticalCaptureStatusDoesNotInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            model.overlayState.statusText = "Capturing"
+            model.overlayState.detectedLanguage = .english
+
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            // handleTranscript reassigns both of these on every transcript event, almost always
+            // to the value they already hold. The menu must not rebuild for a no-op assignment.
+            for _ in 0..<5 {
+                model.overlayState.statusText = "Capturing"
+                model.overlayState.detectedLanguage = .english
+            }
+
+            XCTAssertEqual(
+                republished, 0,
+                "re-assigning the same status and language must not invalidate the menu"
+            )
+
+            // Forward direction: de-duplicating must not mean the menu stops seeing values.
+            // Deleting the mirror sinks entirely would otherwise leave every assertion above
+            // satisfied while the menu froze at its initial text.
+            XCTAssertEqual(model.menuStatusText, "Capturing")
+            XCTAssertEqual(model.menuDetectedLanguage, .english)
+
+            model.overlayState.statusText = "Silence"
+            XCTAssertEqual(model.menuStatusText, "Silence", "a real status change must reach the menu")
+            XCTAssertEqual(republished, 1, "and it must invalidate the menu exactly once")
+        }
+    }
+
+    /// AppModel no longer forwards the downloader's changes, so SettingsView has to observe it
+    /// itself or the download rows silently stop updating — with no compiler error. Assert the
+    /// property wrapper structurally, since the rows themselves need a GUI to exercise.
+    @MainActor
+    func testSettingsViewObservesTheDownloaderItself() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            let view = SettingsView(model: model, downloader: model.modelDownloader)
+            let wrapper = Mirror(reflecting: view).children
+                .first { $0.label == "_downloader" }
+            XCTAssertNotNil(wrapper, "SettingsView must hold the downloader in a property wrapper")
+            XCTAssertTrue(
+                wrapper?.value is ObservedObject<ModelDownloaderClient>,
+                "SettingsView must observe ModelDownloaderClient directly, not through AppModel"
+            )
+        }
+    }
 }
