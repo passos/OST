@@ -503,7 +503,7 @@ final class OSTTests: XCTestCase {
     /// app runs as `.accessory`). So the band has to carry an `.activeAlways` tracking area —
     /// the only route that delivers pointer events to a background app's floating window.
     @MainActor
-    func testResizeCursorDoesNotDependOnBecomingKey() {
+    func testResizeBandInstallsAnActiveAlwaysTrackingArea() {
         let suiteName = "OSTTests.resize-tracking.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }

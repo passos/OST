@@ -16,8 +16,8 @@ public enum OverlayResizeEdge: String, CaseIterable, Sendable {
 ///
 /// The panel is borderless, so AppKit gives it no resize frame of its own and the SwiftUI
 /// hosting view would otherwise claim every point for its window-drag gesture. The AppKit
-/// layer reads these rects for both `resetCursorRects()` and `hitTest(_:)`, so the cursor and
-/// the drag always agree about where the resize band is.
+/// AppKit layer answers both the cursor and the hit test from `edge(at:in:)`, so the two can
+/// never disagree about where the resize band is.
 ///
 /// Coordinates are unflipped AppKit view coordinates: y grows upwards.
 public enum OverlayResizeGeometry {
