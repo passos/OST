@@ -469,4 +469,32 @@ final class OSTTests: XCTestCase {
             "a locked overlay must not claim its edges for resizing"
         )
     }
+
+    /// The construction path already reads the preference, so a test that only locks before
+    /// show() passes even with the update path removed. Toggling on a live panel is what
+    /// actually needs covering — the same shape of gap that let a broken "off" branch ship
+    /// for the screen-capture preference.
+    @MainActor
+    func testTogglingTheLockOnALivePanelReachesTheResizeBand() {
+        let suiteName = "OSTTests.resize-toggle.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, preferences) = makeOverlayCoordinator(defaults, locked: false)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let host = combinedPanel(addedOver: before)?.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+        XCTAssertFalse(host.isLocked)
+
+        preferences.overlayLocked = true
+        coordinator.applyPreferences()
+        XCTAssertTrue(host.isLocked, "locking a visible overlay must reach the resize band")
+
+        preferences.overlayLocked = false
+        coordinator.applyPreferences()
+        XCTAssertFalse(host.isLocked, "unlocking it again must restore the band")
+    }
 }
