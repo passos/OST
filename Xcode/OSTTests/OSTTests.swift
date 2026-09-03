@@ -899,4 +899,82 @@ final class OSTTests: XCTestCase {
         XCTAssertTrue(source.contains("model.toggleTemporaryReposition()"))
         XCTAssertTrue(source.contains("Finish Repositioning"))
     }
+
+    // MARK: - Subtitle rendering and font family (#3)
+
+    /// Font.custom falls back silently when the family is missing, so a stale name from an
+    /// uninstalled font would look like the setting doing nothing.
+    func testAnUnavailableFontFamilyFallsBackToTheSystemFont() {
+        XCTAssertFalse(SubtitleFont.isAvailable("Definitely Not An Installed Family"))
+        XCTAssertEqual(
+            SubtitleFont.resolve(name: "Definitely Not An Installed Family", size: 20, weight: .regular),
+            Font.system(size: 20, weight: .regular)
+        )
+        XCTAssertEqual(
+            SubtitleFont.resolve(name: nil, size: 20, weight: .semibold),
+            Font.system(size: 20, weight: .semibold)
+        )
+    }
+
+    func testAnInstalledFontFamilyIsUsed() throws {
+        let family = try XCTUnwrap(
+            NSFontManager.shared.availableFontFamilies.first(where: { $0 == "Menlo" })
+                ?? NSFontManager.shared.availableFontFamilies.first
+        )
+        XCTAssertTrue(SubtitleFont.isAvailable(family))
+        XCTAssertNotEqual(
+            SubtitleFont.resolve(name: family, size: 20, weight: .regular),
+            Font.system(size: 20, weight: .regular)
+        )
+        // Font.custom takes no weight of its own, so a chosen family rendered the semibold
+        // translation in the same face as the regular transcript.
+        XCTAssertNotEqual(
+            SubtitleFont.resolve(name: family, size: 20, weight: .regular),
+            SubtitleFont.resolve(name: family, size: 20, weight: .semibold),
+            "the weight has to survive the family being chosen"
+        )
+    }
+
+    @MainActor
+    func testSubtitleFontNameRoundTripsThroughPreferencesStore() {
+        let suiteName = "OSTTests.font-name.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = PreferencesStore(userDefaults: defaults)
+        first.subtitleFontName = "Menlo"
+        XCTAssertEqual(PreferencesStore(userDefaults: defaults).subtitleFontName, "Menlo")
+
+        first.subtitleFontName = nil
+        XCTAssertNil(PreferencesStore(userDefaults: defaults).subtitleFontName)
+    }
+
+    /// A view modifier .opacity() forces an offscreen compositing pass, which is what puts
+    /// the faint second copy behind the older lines. Fading the colour does not.
+    func testFadedHistoryDoesNotUseAnOpacityLayer() throws {
+        let source = try String(
+            contentsOf: projectRoot.appending(path: "Sources/OSTApp/Overlay/OverlayContentView.swift"),
+            encoding: .utf8
+        )
+        // A bare `.opacity(...)` in the modifier chain is the offscreen pass. The same call
+        // spelled on a Color inside foregroundStyle is not, so the check is anchored to a
+        // line beginning rather than to the substring, which cannot tell them apart.
+        let modifierFade = source
+            .split(separator: "\n")
+            .contains { $0.trimmingCharacters(in: .whitespaces).hasPrefix(".opacity(entry.id") }
+        XCTAssertFalse(modifierFade, "fade the text colour instead of compositing the row")
+        XCTAssertTrue(
+            source.contains("foregroundStyle(foregroundColor.opacity(entry.id"),
+            "the fade has to ride on the colour that is already being applied"
+        )
+    }
+
+    @MainActor
+    func testSettingsOffersAFontFamilyPicker() throws {
+        let source = try String(
+            contentsOf: projectRoot.appending(path: "Sources/OSTApp/SettingsView.swift"),
+            encoding: .utf8
+        )
+        XCTAssertTrue(source.contains("subtitleFontName"))
+    }
 }
