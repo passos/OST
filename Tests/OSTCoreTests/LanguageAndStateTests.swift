@@ -209,6 +209,27 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
     #expect(decoded.sessionLogDirectoryPath == nil)
 }
 
+@Test func overlayIsHiddenFromScreenCaptureByDefault() {
+    #expect(PreferencesSnapshot().hideOverlayInScreenCapture)
+}
+
+@Test func overlayScreenCaptureHidingPreferenceRoundTripsWhenDisabled() throws {
+    let original = PreferencesSnapshot(hideOverlayInScreenCapture: false)
+    let decoded = try JSONDecoder().decode(
+        PreferencesSnapshot.self,
+        from: JSONEncoder().encode(original)
+    )
+    #expect(decoded.hideOverlayInScreenCapture == false)
+}
+
+@Test func olderPreferencesHideOverlayFromScreenCaptureByDefault() throws {
+    let decoded = try JSONDecoder().decode(
+        PreferencesSnapshot.self,
+        from: Data("{}".utf8)
+    )
+    #expect(decoded.hideOverlayInScreenCapture)
+}
+
 @Test func appDisplayLanguageSupportsFourLocalesAndDefaultsToEnglish() {
     #expect(AppDisplayLanguage.allCases == [.english, .chinese, .japanese, .korean])
     #expect(PreferencesSnapshot().appDisplayLanguage == .english)

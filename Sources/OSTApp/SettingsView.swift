@@ -372,6 +372,7 @@ struct SettingsView: View {
                 Text(t("Unlock the overlay to resize it from an edge or drag its background to move it."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle(t("Hide overlay in screenshots and screen recordings"), isOn: hideOverlayInScreenCaptureBinding)
                 Button(t("Reset overlay position and size")) { model.resetOverlayFrames() }
             }
             Section(t("Overlay window preview")) {
@@ -642,6 +643,9 @@ struct SettingsView: View {
     }
     private var overlayLockedBinding: Binding<Bool> {
         Binding(get: { model.preferences.overlayLocked }, set: { model.preferences.overlayLocked = $0 })
+    }
+    private var hideOverlayInScreenCaptureBinding: Binding<Bool> {
+        Binding(get: { model.preferences.hideOverlayInScreenCapture }, set: { model.preferences.hideOverlayInScreenCapture = $0 })
     }
     private var sourceColorBinding: Binding<Color> {
         colorBinding(get: { model.preferences.sourceColor }, set: { model.preferences.sourceColor = $0 })

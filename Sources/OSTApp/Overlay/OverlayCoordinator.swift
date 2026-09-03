@@ -39,6 +39,7 @@ final class OverlayCoordinator {
     private var sizingSignature: SizingSignature
     private var appliedSizingSignatures: [OverlayPanelKind: SizingSignature] = [:]
     private(set) var isVisible = true
+    private var appliedScreenCaptureHiding: Bool?
 
     init(
         state: OverlayState,
@@ -89,6 +90,15 @@ final class OverlayCoordinator {
 
     func applyPreferences() {
         guard isVisible else { return }
+        // NSWindow.sharingType cannot be moved back off .none once it is set, so the
+        // panels have to be rebuilt when the preference changes. Frame autosave restores
+        // each panel's position and size, so the rebuild is invisible to the user.
+        if let applied = appliedScreenCaptureHiding,
+           applied != preferences.hideOverlayInScreenCapture {
+            panels.values.forEach { $0.orderOut(nil) }
+            panels.removeAll()
+        }
+        appliedScreenCaptureHiding = preferences.hideOverlayInScreenCapture
         let newSizingSignature = SizingSignature(
             lineCount: preferences.overlayLineCount,
             sourceFontSize: preferences.sourceFontSize,
@@ -144,6 +154,7 @@ final class OverlayCoordinator {
         )
         panel.title = title(for: kind)
         panel.level = .floating
+        if preferences.hideOverlayInScreenCapture { panel.sharingType = .none }
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.isFloatingPanel = true
         panel.hidesOnDeactivate = false
