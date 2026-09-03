@@ -10,6 +10,8 @@ enum SubtitleFont {
         guard let name, isAvailable(name) else {
             return .system(size: size, weight: weight)
         }
-        return .custom(name, size: size)
+        // Font.custom takes no weight, so without this the semibold translation renders in
+        // the same face as the regular transcript the moment a family is chosen.
+        return .custom(name, size: size).weight(weight)
     }
 }
