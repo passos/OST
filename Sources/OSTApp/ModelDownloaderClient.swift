@@ -103,6 +103,7 @@ final class ModelDownloaderClient: ObservableObject {
     private func poll(descriptor: ModelDescriptor, requestID: UUID) {
         pollingTasks[descriptor.id]?.cancel()
         pollingTasks[descriptor.id] = Task { [weak self] in
+            defer { self?.pollingTasks[descriptor.id] = nil }
             while !Task.isCancelled {
                 guard let self, let proxy = self.proxy() else { return }
                 let status = await withCheckedContinuation { continuation in

@@ -18,6 +18,9 @@ enum SettingsTab: Hashable {
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    /// Observed directly: AppModel no longer forwards the downloader's 500ms progress
+    /// updates, because the menu bar tree must not rebuild for them.
+    @ObservedObject var downloader: ModelDownloaderClient
     @State private var presentedNotice: PresentedNotice?
     @State private var pendingInstall: ModelDescriptor?
     @State private var pendingDelete: ModelDescriptor?
@@ -66,7 +69,7 @@ struct SettingsView: View {
             presenting: pendingInstall
         ) { descriptor in
             Button(t("Agree to License and Download")) {
-                model.modelDownloader.install(descriptor)
+                downloader.install(descriptor)
                 pendingInstall = nil
             }
             Button(t("Cancel"), role: .cancel) { pendingInstall = nil }
@@ -79,7 +82,7 @@ struct SettingsView: View {
             presenting: pendingDelete
         ) { descriptor in
             Button(t("Delete Downloaded Model"), role: .destructive) {
-                model.modelDownloader.delete(descriptor)
+                downloader.delete(descriptor)
                 pendingDelete = nil
             }
             Button(t("Cancel"), role: .cancel) { pendingDelete = nil }
@@ -224,18 +227,18 @@ struct SettingsView: View {
                         .foregroundStyle(.orange)
                 }
                 Spacer()
-                if model.modelDownloader.isInstalled(descriptor) {
+                if downloader.isInstalled(descriptor) {
                     VStack(alignment: .trailing, spacing: 6) {
                         Button(t("Show in Finder")) { model.revealModel(descriptor) }
                         Button(t("Delete Downloaded Model"), role: .destructive) {
                             pendingDelete = descriptor
                         }
                     }
-                } else if let status = model.modelDownloader.statusByModelID[descriptor.id],
+                } else if let status = downloader.statusByModelID[descriptor.id],
                           ![.completed, .cancelled, .failed].contains(status.phase) {
-                    Button(t("Cancel")) { model.modelDownloader.cancel(descriptor) }
-                } else if model.modelDownloader.statusByModelID[descriptor.id]?.phase == .cancelled {
-                    Button(t("Resume")) { model.modelDownloader.resume(descriptor) }
+                    Button(t("Cancel")) { downloader.cancel(descriptor) }
+                } else if downloader.statusByModelID[descriptor.id]?.phase == .cancelled {
+                    Button(t("Resume")) { downloader.resume(descriptor) }
                 } else {
                     Button(t("Download")) { pendingInstall = descriptor }
                 }
@@ -258,7 +261,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if let status = model.modelDownloader.statusByModelID[descriptor.id] {
+            if let status = downloader.statusByModelID[descriptor.id] {
                 ProgressView(
                     value: Double(status.completedBytes),
                     total: Double(max(status.totalBytes, 1))
@@ -267,7 +270,7 @@ struct SettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            if let error = model.modelDownloader.errorByModelID[descriptor.id] {
+            if let error = downloader.errorByModelID[descriptor.id] {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
         }

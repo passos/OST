@@ -8,7 +8,7 @@ struct MenuBarView: View {
     var body: some View {
         Group {
             Label(statusLabel, systemImage: statusImage)
-            if let language = model.overlayState.detectedLanguage {
+            if let language = model.menuDetectedLanguage {
                 Text("\(t("Detected:")) \(AppCopy.languageName(language, displayLanguage: model.preferences.appDisplayLanguage))")
             }
 
@@ -114,7 +114,7 @@ struct MenuBarView: View {
         case .idle: t("Waiting")
         case .requestingPermission: t("Checking permission")
         case .preparingModels: t("Preparing models")
-        case .running: model.overlayState.statusText
+        case .running: model.menuStatusText
         case .stopping: t("Stopping")
         case .failed(let failure): AppCopy.captureFailure(failure, language: model.preferences.appDisplayLanguage)
         }
