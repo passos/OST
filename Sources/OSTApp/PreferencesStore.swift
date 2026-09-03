@@ -93,6 +93,11 @@ final class PreferencesStore: ObservableObject {
         set { snapshot.overlayLocked = newValue }
     }
 
+    var hideOverlayInScreenCapture: Bool {
+        get { snapshot.hideOverlayInScreenCapture }
+        set { snapshot.hideOverlayInScreenCapture = newValue }
+    }
+
     var sourceFontSize: Double {
         get { snapshot.sourceFontSize }
         set { snapshot.sourceFontSize = min(max(newValue, 12), 72) }

@@ -172,6 +172,7 @@ final class OverlayCoordinator {
         let minimumSize = minimumSize(for: kind)
         panel.minSize = minimumSize
         panel.ignoresMouseEvents = preferences.overlayLocked
+        panel.sharingType = preferences.hideOverlayInScreenCapture ? .none : .readOnly
         panel.isMovableByWindowBackground = !preferences.overlayLocked
         if preferences.overlayLocked {
             panel.styleMask.remove(.resizable)

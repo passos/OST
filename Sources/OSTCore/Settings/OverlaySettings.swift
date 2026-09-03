@@ -69,6 +69,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var mlxTranslationPrompt: String
     public var overlayLayout: OverlayLayout
     public var overlayLocked: Bool
+    public var hideOverlayInScreenCapture: Bool
     public var sourceFontSize: Double
     public var translationFontSize: Double
     public var previewFontSize: Double
@@ -96,6 +97,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         mlxTranslationPrompt: String = MLXPromptDefaults.translation,
         overlayLayout: OverlayLayout = .combined,
         overlayLocked: Bool = false,
+        hideOverlayInScreenCapture: Bool = true,
         sourceFontSize: Double = 20,
         translationFontSize: Double = 28,
         previewFontSize: Double = 28,
@@ -122,6 +124,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         self.mlxTranslationPrompt = String(mlxTranslationPrompt.prefix(4_000))
         self.overlayLayout = overlayLayout
         self.overlayLocked = overlayLocked
+        self.hideOverlayInScreenCapture = hideOverlayInScreenCapture
         self.sourceFontSize = min(max(sourceFontSize, 12), 72)
         self.translationFontSize = min(max(translationFontSize, 12), 72)
         self.previewFontSize = min(max(previewFontSize, 12), 72)
@@ -150,6 +153,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         case mlxTranslationPrompt
         case overlayLayout
         case overlayLocked
+        case hideOverlayInScreenCapture
         case sourceFontSize
         case translationFontSize
         case previewFontSize
@@ -182,6 +186,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
             mlxTranslationPrompt: try values.decodeIfPresent(String.self, forKey: .mlxTranslationPrompt) ?? MLXPromptDefaults.translation,
             overlayLayout: try values.decodeIfPresent(OverlayLayout.self, forKey: .overlayLayout) ?? .combined,
             overlayLocked: try values.decodeIfPresent(Bool.self, forKey: .overlayLocked) ?? true,
+            hideOverlayInScreenCapture: try values.decodeIfPresent(Bool.self, forKey: .hideOverlayInScreenCapture) ?? true,
             sourceFontSize: try values.decodeIfPresent(Double.self, forKey: .sourceFontSize) ?? 20,
             translationFontSize: translationFontSize,
             previewFontSize: try values.decodeIfPresent(Double.self, forKey: .previewFontSize) ?? translationFontSize,
