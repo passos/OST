@@ -14,7 +14,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            Button(model.captureState == .running ? t("Stop") : t("Start")) {
+            Button(model.captureState.toggleIntent == .stop ? t("Stop") : t("Start")) {
                 Task {
                     await model.toggleCapture()
                 }

@@ -274,6 +274,38 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
 
 /// The hot key and the menu button share one decision, so the decision has to exist
 /// somewhere both can reach and a test can drive without a microphone.
+@Test func commandOnlyBindingsAreRefused() {
+    // The recorder's own escape hatch is the trap: pressing Command-Q to get out would
+    // otherwise bind Command-Q globally and take it away from every other app.
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0C, modifiers: CaptureShortcut.commandModifier) == false)
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0C, modifiers: 0) == false)
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: CaptureShortcut.escapeKeyCode, modifiers: CaptureShortcut.controlModifier) == false)
+}
+
+@Test func bindingsCarryingControlOrOptionAreAccepted() {
+    let control = CaptureShortcut.controlModifier
+    let option = CaptureShortcut.optionModifier
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0B, modifiers: control | option))
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0B, modifiers: option))
+    // Command is fine as long as it is not the only modifier.
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0B, modifiers: control | CaptureShortcut.commandModifier))
+}
+
+/// Why start() carries a generation guard: once a hot key stops capture mid-start, the
+/// machine is back at .idle, and the suspended start's own transition is then illegal.
+/// Without the guard that throw is reported to the user as a model-load failure.
+@Test func aStartThatResumesAfterAStopCannotReachRunning() async throws {
+    let machine = CaptureStateMachine()
+    #expect(try await machine.transition(to: .requestingPermission) == .requestingPermission)
+    #expect(try await machine.transition(to: .preparingModels) == .preparingModels)
+    #expect(try await machine.transition(to: .stopping) == .stopping)
+    #expect(try await machine.transition(to: .idle) == .idle)
+
+    await #expect(throws: CaptureTransitionError.self) {
+        _ = try await machine.transition(to: .running)
+    }
+}
+
 /// toggleIntent promises a stop while capture is still coming up, so the state machine has
 /// to accept that stop. It did not before: stop() already let .preparingModels through while
 /// the machine rejected the transition, so the hot key would have hit the failure path.

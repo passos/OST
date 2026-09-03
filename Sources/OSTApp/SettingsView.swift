@@ -27,7 +27,15 @@ struct SettingsView: View {
     @State private var pendingDelete: ModelDescriptor?
     @State private var isRecordingCaptureShortcut = false
     @State private var captureShortcutMonitor: Any?
-    @State private var captureShortcutError: String?
+    @State private var captureShortcutError: CaptureShortcutError?
+
+    /// A case rather than a stored string: the localisation guard scans source for string
+    /// literals passed to the translate helper, so a message held in a variable and
+    /// translated later would slip past it untranslated.
+    private enum CaptureShortcutError {
+        case notRegistrable
+        case needsStrongerModifiers
+    }
 
     var body: some View {
         TabView(selection: $model.selectedSettingsTab) {
@@ -167,11 +175,11 @@ struct SettingsView: View {
                         }
                     }
                 }
-                Text(t("Use at least one modifier key. Bare global keys are refused."))
+                Text(t("Use Control or Option, optionally with Shift or Command."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let captureShortcutError {
-                    Text(t(captureShortcutError))
+                if let captureShortcutErrorText {
+                    Text(captureShortcutErrorText)
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
@@ -554,6 +562,15 @@ struct SettingsView: View {
         presentedNotice = PresentedNotice(title: title, text: text)
     }
 
+    private var captureShortcutErrorText: String? {
+        switch captureShortcutError {
+        case .none: nil
+        case .notRegistrable: t("That shortcut could not be registered.")
+        case .needsStrongerModifiers:
+            t("Add Control or Option. A Command-only shortcut would be taken from every app.")
+        }
+    }
+
     private func startCaptureShortcutRecording() {
         stopCaptureShortcutRecording()
         captureShortcutError = nil
@@ -577,6 +594,20 @@ struct SettingsView: View {
             keyCode: UInt32(event.keyCode),
             modifiers: carbonModifiers(from: event.modifierFlags)
         )
+        // Escape is how anyone leaves a recorder, so it means "never mind" rather than
+        // "bind Escape globally".
+        if shortcut.keyCode == CaptureShortcut.escapeKeyCode, shortcut.modifiers == 0 {
+            stopCaptureShortcutRecording()
+            return nil
+        }
+        guard CaptureShortcut.isAcceptableBinding(
+            keyCode: shortcut.keyCode,
+            modifiers: shortcut.modifiers
+        ) else {
+            captureShortcutError = .needsStrongerModifiers
+            stopCaptureShortcutRecording()
+            return nil
+        }
         let registrar = GlobalHotKey()
         let accepted = registrar.register(
             keyCode: shortcut.keyCode,
@@ -588,7 +619,7 @@ struct SettingsView: View {
             model.preferences.captureShortcut = shortcut
             captureShortcutError = nil
         } else {
-            captureShortcutError = "That shortcut could not be registered."
+            captureShortcutError = .notRegistrable
         }
         stopCaptureShortcutRecording()
         return nil

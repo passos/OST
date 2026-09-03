@@ -66,6 +66,26 @@ public struct CaptureShortcut: Codable, Sendable, Equatable {
         self.keyCode = keyCode
         self.modifiers = modifiers
     }
+
+    // Carbon's modifier bits, restated so OSTCore stays free of Carbon. An app-side test
+    // asserts these still equal cmdKey / shiftKey / optionKey / controlKey.
+    public static let commandModifier: UInt32 = 0x0100
+    public static let shiftModifier: UInt32 = 0x0200
+    public static let optionModifier: UInt32 = 0x0800
+    public static let controlModifier: UInt32 = 0x1000
+    public static let escapeKeyCode: UInt32 = 0x35
+
+    /// Whether this combination may be claimed system-wide.
+    ///
+    /// Command on its own is how nearly every application spells its menu shortcuts, so a
+    /// global Command+key binding swallows that command everywhere until the user clears
+    /// it -- recording one by pressing Command-Q to escape the recorder is the obvious way
+    /// to get bitten. Requiring a second modifier costs one key and removes the whole
+    /// class, which is cheaper than maintaining a list of combinations to avoid.
+    public static func isAcceptableBinding(keyCode: UInt32, modifiers: UInt32) -> Bool {
+        guard modifiers != 0, modifiers != commandModifier else { return false }
+        return keyCode != escapeKeyCode
+    }
 }
 
 public struct PreferencesSnapshot: Codable, Sendable, Equatable {

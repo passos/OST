@@ -629,11 +629,34 @@ final class OSTTests: XCTestCase {
         // SwiftUI Button actions are hard to invoke without rebuilding the menu in a GUI
         // session, so this source assertion guards the dispatch shape directly.
         XCTAssertTrue(menuBarViewSource.contains("await model.toggleCapture()"))
-        XCTAssertEqual(
-            menuBarViewSource.components(separatedBy: "model.captureState == .running").count - 1,
-            1,
-            "the label may branch on the state, but the action must not duplicate start/stop"
+        XCTAssertFalse(
+            menuBarViewSource.contains("await model.start()")
+                || menuBarViewSource.contains("await model.stop()"),
+            "the action must not re-derive start/stop next to toggleCapture()"
         )
+        // The label has to be read off the same decision the action takes. Branching on
+        // `== .running` made the button read "Start" while it was about to cancel a start
+        // that was still coming up.
+        XCTAssertTrue(menuBarViewSource.contains("toggleIntent == .stop"))
+        XCTAssertFalse(menuBarViewSource.contains("model.captureState == .running"))
+    }
+
+    /// OSTCore restates Carbon's modifier bits so it need not import Carbon. If Apple ever
+    /// moved them, every stored shortcut would silently rebind to something else.
+    func testShortcutModifierConstantsStillMatchCarbon() {
+        XCTAssertEqual(CaptureShortcut.commandModifier, UInt32(cmdKey))
+        XCTAssertEqual(CaptureShortcut.shiftModifier, UInt32(shiftKey))
+        XCTAssertEqual(CaptureShortcut.optionModifier, UInt32(optionKey))
+        XCTAssertEqual(CaptureShortcut.controlModifier, UInt32(controlKey))
+        XCTAssertEqual(CaptureShortcut.escapeKeyCode, UInt32(kVK_Escape))
+    }
+
+    @MainActor
+    func testRegistrarRefusesACommandOnlyCombination() {
+        let registrar = GlobalHotKey()
+        defer { registrar.unregister() }
+
+        XCTAssertFalse(registrar.register(keyCode: 0x0C, modifiers: UInt32(cmdKey)))
     }
 
     @MainActor

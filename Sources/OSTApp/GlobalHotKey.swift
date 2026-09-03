@@ -1,5 +1,6 @@
 import Carbon.HIToolbox
 import Foundation
+import OSTCore
 
 /// 'OSTH'. File scope because the Carbon callback below is nonisolated.
 private let globalHotKeySignature = OSType(0x4F535448)
@@ -56,7 +57,9 @@ final class GlobalHotKey {
     }
 
     func register(keyCode: UInt32, modifiers: UInt32) -> Bool {
-        guard modifiers != 0 else { return false }
+        guard CaptureShortcut.isAcceptableBinding(keyCode: keyCode, modifiers: modifiers) else {
+            return false
+        }
         unregister()
         guard Self.installEventHandlerIfNeeded() else { return false }
 

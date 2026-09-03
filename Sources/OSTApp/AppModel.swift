@@ -50,6 +50,11 @@ final class AppModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var activeSessionLogDirectory: URL?
     private var registeredCaptureShortcut: CaptureShortcut?
+    /// Bumped whenever a start or a stop begins. start() awaits the microphone and the
+    /// model load, and a hot key can now stop capture during either -- so on the way back
+    /// it has to notice it was superseded instead of reporting a model-load failure the
+    /// user never caused.
+    private var captureGeneration = 0
 
     init() {
         let preferences = PreferencesStore()
@@ -133,6 +138,8 @@ final class AppModel: ObservableObject {
         guard captureState != .running,
               captureState != .requestingPermission,
               captureState != .preparingModels else { return }
+        captureGeneration += 1
+        let generation = captureGeneration
         do {
             if case .failed = captureState {
                 try await transition(to: .idle)
@@ -153,8 +160,10 @@ final class AppModel: ObservableObject {
             await startSessionLoggingIfNeeded()
             try await transition(to: .preparingModels)
             try await provider.prepare(configuration: transcriptionConfiguration)
+            guard generation == captureGeneration else { return }
             activeTranscriptionProvider = provider
             try await prepareSelectedMLXTranslationIfNeeded()
+            guard generation == captureGeneration else { return }
             try await transition(to: .running)
             overlayState.statusText = captureStatusText
 
@@ -171,6 +180,9 @@ final class AppModel: ObservableObject {
                 }
             }
         } catch {
+            // A stop that landed mid-start is why this threw; surfacing it would blame the
+            // user's own cancellation on the model loader.
+            guard generation == captureGeneration else { return }
             let failure = Self.captureFailure(from: error)
             if failure == .automaticModelMissing {
                 showModelSettings()
@@ -183,6 +195,7 @@ final class AppModel: ObservableObject {
         guard captureState == .running
             || captureState == .preparingModels
             || captureState == .requestingPermission else { return }
+        captureGeneration += 1
         do {
             try await transition(to: .stopping)
         } catch {
