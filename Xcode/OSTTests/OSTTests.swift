@@ -727,4 +727,176 @@ final class OSTTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
     }
+
+    // MARK: - Temporary reposition of a locked overlay (#6)
+
+    /// Locking is implemented as ignoresMouseEvents, which is the only way to get real
+    /// click-through -- a contentView returning nil from hitTest still swallows the click.
+    /// So no modifier-drag can exist: the events never reach this process. A temporary
+    /// unlock is the mechanism, and it has to move every part of the lock, not just one.
+    @MainActor
+    func testTemporaryRepositionMakesALockedOverlayDraggable() {
+        let suiteName = "OSTTests.reposition.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults, locked: true)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let panel = combinedPanel(addedOver: before),
+              let host = panel.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+        XCTAssertTrue(panel.ignoresMouseEvents)
+
+        coordinator.beginTemporaryReposition()
+        XCTAssertFalse(panel.ignoresMouseEvents, "a repositioning overlay has to receive clicks")
+        XCTAssertTrue(panel.isMovableByWindowBackground, "and its background has to drag it")
+        XCTAssertFalse(host.isLocked, "and its resize band has to come back")
+
+        coordinator.endTemporaryReposition()
+        XCTAssertTrue(panel.ignoresMouseEvents, "click-through must come back on its own")
+        XCTAssertTrue(host.isLocked)
+    }
+
+    /// The failure that matters is the overlay stuck opaque to clicks with no sign of why,
+    /// so the way out cannot depend on the user remembering the way out.
+    @MainActor
+    func testTemporaryRepositionEndsByItself() async throws {
+        let suiteName = "OSTTests.reposition-timeout.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let preferences = PreferencesStore(userDefaults: defaults)
+        preferences.overlayLayout = .combined
+        preferences.overlayLocked = true
+        let coordinator = OverlayCoordinator(
+            state: OverlayState(),
+            preferences: preferences,
+            translationPackCoordinator: TranslationPackCoordinator(),
+            temporaryRepositionTimeout: .milliseconds(200)
+        )
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let panel = combinedPanel(addedOver: before) else {
+            return XCTFail("the panel did not appear.")
+        }
+
+        coordinator.beginTemporaryReposition()
+        XCTAssertFalse(panel.ignoresMouseEvents)
+
+        let deadline = Date().addingTimeInterval(5)
+        while coordinator.isTemporarilyRepositioning, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertTrue(
+            panel.ignoresMouseEvents,
+            "an untouched reposition must expire rather than leave the overlay solid"
+        )
+        XCTAssertFalse(coordinator.isTemporarilyRepositioning)
+    }
+
+    /// The mode borrows against the lock, so it cannot outlive it. Unlocking during a
+    /// reposition otherwise left the accent border and the "finish" entry on an overlay
+    /// that was already unlocked, waiting out a timer for nothing.
+    @MainActor
+    func testUnlockingDuringARepositionEndsTheMode() {
+        let suiteName = "OSTTests.reposition-unlock.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let preferences = PreferencesStore(userDefaults: defaults)
+        preferences.overlayLayout = .combined
+        preferences.overlayLocked = true
+        let state = OverlayState()
+        let coordinator = OverlayCoordinator(
+            state: state,
+            preferences: preferences,
+            translationPackCoordinator: TranslationPackCoordinator()
+        )
+        defer { coordinator.hide() }
+        coordinator.show()
+        coordinator.beginTemporaryReposition()
+        XCTAssertTrue(coordinator.isTemporarilyRepositioning)
+
+        preferences.overlayLocked = false
+        coordinator.applyPreferences()
+        XCTAssertFalse(coordinator.isTemporarilyRepositioning)
+        XCTAssertFalse(state.isRepositioning, "the overlay must stop advertising the mode")
+    }
+
+    /// The mode is invisible unless the overlay says so, and a mode the user cannot see is
+    /// the same bug as one they cannot leave.
+    @MainActor
+    func testTemporaryRepositionTellsTheOverlayToShowIt() {
+        let suiteName = "OSTTests.reposition-visible.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let preferences = PreferencesStore(userDefaults: defaults)
+        preferences.overlayLayout = .combined
+        preferences.overlayLocked = true
+        let state = OverlayState()
+        let coordinator = OverlayCoordinator(
+            state: state,
+            preferences: preferences,
+            translationPackCoordinator: TranslationPackCoordinator()
+        )
+        defer { coordinator.hide() }
+        coordinator.show()
+
+        XCTAssertFalse(state.isRepositioning)
+        coordinator.beginTemporaryReposition()
+        XCTAssertTrue(state.isRepositioning)
+        coordinator.endTemporaryReposition()
+        XCTAssertFalse(state.isRepositioning)
+    }
+
+    /// An unlocked overlay is already draggable, so the mode would only add a mystery
+    /// border and a timer.
+    @MainActor
+    func testTemporaryRepositionDoesNothingWhenTheOverlayIsAlreadyUnlocked() {
+        let suiteName = "OSTTests.reposition-unlocked.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults, locked: false)
+        defer { coordinator.hide() }
+        coordinator.show()
+
+        coordinator.beginTemporaryReposition()
+        XCTAssertFalse(coordinator.isTemporarilyRepositioning)
+    }
+
+    @MainActor
+    func testRepositionShortcutRoundTripsThroughPreferencesStore() {
+        let suiteName = "OSTTests.reposition-shortcut.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let first = PreferencesStore(userDefaults: defaults)
+        first.repositionShortcut = CaptureShortcut(keyCode: 0x0B, modifiers: hotKeyModifiers)
+
+        let second = PreferencesStore(userDefaults: defaults)
+        XCTAssertEqual(
+            second.repositionShortcut,
+            CaptureShortcut(keyCode: 0x0B, modifiers: hotKeyModifiers)
+        )
+    }
+
+    /// Not everyone binds a shortcut, and the feature must not be reachable only through
+    /// one the user has to discover and configure first.
+    @MainActor
+    func testMenuOffersTheRepositionEntry() throws {
+        let source = try String(
+            contentsOf: projectRoot.appending(path: "Sources/OSTApp/MenuBarView.swift"),
+            encoding: .utf8
+        )
+        // One entry that both enters and leaves the mode: entering from the menu and then
+        // having to wait out the timeout to leave is the same trap as no exit at all.
+        XCTAssertTrue(source.contains("model.toggleTemporaryReposition()"))
+        XCTAssertTrue(source.contains("Finish Repositioning"))
+    }
 }

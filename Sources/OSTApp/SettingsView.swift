@@ -25,16 +25,23 @@ struct SettingsView: View {
     @State private var presentedNotice: PresentedNotice?
     @State private var pendingInstall: ModelDescriptor?
     @State private var pendingDelete: ModelDescriptor?
-    @State private var isRecordingCaptureShortcut = false
-    @State private var captureShortcutMonitor: Any?
-    @State private var captureShortcutError: CaptureShortcutError?
+    @State private var recordingShortcut: ShortcutSlot?
+    @State private var shortcutMonitor: Any?
+    @State private var shortcutError: ShortcutRecorderError?
+    @State private var shortcutErrorSlot: ShortcutSlot?
 
     /// A case rather than a stored string: the localisation guard scans source for string
     /// literals passed to the translate helper, so a message held in a variable and
     /// translated later would slip past it untranslated.
-    private enum CaptureShortcutError {
+    private enum ShortcutSlot {
+        case capture
+        case reposition
+    }
+
+    private enum ShortcutRecorderError {
         case notRegistrable
         case needsStrongerModifiers
+        case alreadyUsed
     }
 
     var body: some View {
@@ -155,39 +162,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section(t("Capture shortcut")) {
-                HStack {
-                    Text(captureShortcutLabel)
-                        .foregroundStyle(model.preferences.captureShortcut == nil ? .secondary : .primary)
-                    Spacer()
-                    Button(isRecordingCaptureShortcut ? t("Press shortcut") : t("Record Shortcut")) {
-                        if isRecordingCaptureShortcut {
-                            stopCaptureShortcutRecording()
-                        } else {
-                            startCaptureShortcutRecording()
-                        }
-                    }
-                    if model.preferences.captureShortcut != nil {
-                        Button(t("Clear")) {
-                            stopCaptureShortcutRecording()
-                            captureShortcutError = nil
-                            model.preferences.captureShortcut = nil
-                        }
-                    }
-                }
-                Text(t("Use Control or Option, optionally with Shift or Command."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let captureShortcutErrorText {
-                    Text(captureShortcutErrorText)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
+            shortcutRecorderSection(title: t("Capture shortcut"), slot: .capture)
+            shortcutRecorderSection(title: t("Reposition shortcut"), slot: .reposition)
         }
         .formStyle(.grouped)
         .onDisappear {
-            stopCaptureShortcutRecording()
+            stopShortcutRecording()
         }
     }
 
@@ -473,13 +453,6 @@ struct SettingsView: View {
         }
     }
 
-    private var captureShortcutLabel: String {
-        guard let shortcut = model.preferences.captureShortcut else {
-            return t("No shortcut set")
-        }
-        return shortcutDescription(shortcut)
-    }
-
     private var hasLowContrast: Bool {
         model.preferences.sourceColor.contrastRatio(against: model.preferences.backgroundColor) < 4.5
             || model.preferences.translationColor.contrastRatio(against: model.preferences.backgroundColor) < 4.5
@@ -562,34 +535,94 @@ struct SettingsView: View {
         presentedNotice = PresentedNotice(title: title, text: text)
     }
 
-    private var captureShortcutErrorText: String? {
-        switch captureShortcutError {
-        case .none: nil
-        case .notRegistrable: t("That shortcut could not be registered.")
+    private func shortcutRecorderSection(title: String, slot: ShortcutSlot) -> some View {
+        Section(title) {
+            HStack {
+                Text(shortcutLabel(for: slot))
+                    .foregroundStyle(shortcut(for: slot) == nil ? .secondary : .primary)
+                Spacer()
+                Button(recordingShortcut == slot ? t("Press shortcut") : t("Record Shortcut")) {
+                    if recordingShortcut == slot {
+                        stopShortcutRecording()
+                    } else {
+                        startShortcutRecording(slot)
+                    }
+                }
+                if shortcut(for: slot) != nil {
+                    Button(t("Clear")) {
+                        stopShortcutRecording()
+                        shortcutError = nil
+                        shortcutErrorSlot = nil
+                        setShortcut(nil, for: slot)
+                    }
+                }
+            }
+            Text(t("Use Control or Option, optionally with Shift or Command."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let text = shortcutErrorText(for: slot) {
+                Text(text)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private func shortcutLabel(for slot: ShortcutSlot) -> String {
+        guard let shortcut = shortcut(for: slot) else {
+            return t("No shortcut set")
+        }
+        return shortcutDescription(shortcut)
+    }
+
+    private func shortcut(for slot: ShortcutSlot) -> CaptureShortcut? {
+        switch slot {
+        case .capture: model.preferences.captureShortcut
+        case .reposition: model.preferences.repositionShortcut
+        }
+    }
+
+    private func setShortcut(_ shortcut: CaptureShortcut?, for slot: ShortcutSlot) {
+        switch slot {
+        case .capture: model.preferences.captureShortcut = shortcut
+        case .reposition: model.preferences.repositionShortcut = shortcut
+        }
+    }
+
+    private func shortcutErrorText(for slot: ShortcutSlot) -> String? {
+        guard shortcutErrorSlot == slot else { return nil }
+        switch shortcutError {
+        case .none:
+            return nil
+        case .notRegistrable:
+            return t("That shortcut could not be registered.")
         case .needsStrongerModifiers:
-            t("Add Control or Option. A Command-only shortcut would be taken from every app.")
+            return t("Add Control or Option. A Command-only shortcut would be taken from every app.")
+        case .alreadyUsed:
+            return t("That shortcut is already assigned to the other action.")
         }
     }
 
-    private func startCaptureShortcutRecording() {
-        stopCaptureShortcutRecording()
-        captureShortcutError = nil
-        isRecordingCaptureShortcut = true
-        captureShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+    private func startShortcutRecording(_ slot: ShortcutSlot) {
+        stopShortcutRecording()
+        shortcutError = nil
+        shortcutErrorSlot = nil
+        recordingShortcut = slot
+        shortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             guard event.type == .keyDown else { return event }
-            return handleCaptureShortcutEvent(event)
+            return handleShortcutEvent(event, for: slot)
         }
     }
 
-    private func stopCaptureShortcutRecording() {
-        if let captureShortcutMonitor {
-            NSEvent.removeMonitor(captureShortcutMonitor)
-            self.captureShortcutMonitor = nil
+    private func stopShortcutRecording() {
+        if let shortcutMonitor {
+            NSEvent.removeMonitor(shortcutMonitor)
+            self.shortcutMonitor = nil
         }
-        isRecordingCaptureShortcut = false
+        recordingShortcut = nil
     }
 
-    private func handleCaptureShortcutEvent(_ event: NSEvent) -> NSEvent? {
+    private func handleShortcutEvent(_ event: NSEvent, for slot: ShortcutSlot) -> NSEvent? {
         let shortcut = CaptureShortcut(
             keyCode: UInt32(event.keyCode),
             modifiers: carbonModifiers(from: event.modifierFlags)
@@ -597,15 +630,23 @@ struct SettingsView: View {
         // Escape is how anyone leaves a recorder, so it means "never mind" rather than
         // "bind Escape globally".
         if shortcut.keyCode == CaptureShortcut.escapeKeyCode, shortcut.modifiers == 0 {
-            stopCaptureShortcutRecording()
+            stopShortcutRecording()
+            return nil
+        }
+        // One combination bound to both slots would fire both actions on a single press.
+        if shortcut == self.shortcut(for: slot == .capture ? .reposition : .capture) {
+            shortcutError = .alreadyUsed
+            shortcutErrorSlot = slot
+            stopShortcutRecording()
             return nil
         }
         guard CaptureShortcut.isAcceptableBinding(
             keyCode: shortcut.keyCode,
             modifiers: shortcut.modifiers
         ) else {
-            captureShortcutError = .needsStrongerModifiers
-            stopCaptureShortcutRecording()
+            shortcutError = .needsStrongerModifiers
+            shortcutErrorSlot = slot
+            stopShortcutRecording()
             return nil
         }
         let registrar = GlobalHotKey()
@@ -616,12 +657,14 @@ struct SettingsView: View {
         registrar.unregister()
 
         if accepted {
-            model.preferences.captureShortcut = shortcut
-            captureShortcutError = nil
+            setShortcut(shortcut, for: slot)
+            shortcutError = nil
+            shortcutErrorSlot = nil
         } else {
-            captureShortcutError = .notRegistrable
+            shortcutError = .notRegistrable
+            shortcutErrorSlot = slot
         }
-        stopCaptureShortcutRecording()
+        stopShortcutRecording()
         return nil
     }
 

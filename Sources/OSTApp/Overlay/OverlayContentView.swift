@@ -34,10 +34,10 @@ struct OverlayContentView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(.white.opacity(0.08), lineWidth: 1)
+                    .stroke(borderColor, lineWidth: state.isRepositioning ? 3 : 1)
             }
             .overlay(alignment: .bottomTrailing) {
-                if !preferences.overlayLocked, !isSettingsPreview {
+                if showsWindowControls {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.caption2)
                         .foregroundStyle(.white.opacity(0.45))
@@ -51,7 +51,7 @@ struct OverlayContentView: View {
 
     @ViewBuilder
     private var draggableContent: some View {
-        if preferences.overlayLocked || isSettingsPreview {
+        if !showsWindowControls {
             content
         } else {
             content
@@ -113,6 +113,14 @@ struct OverlayContentView: View {
             blue: value.blue,
             opacity: value.alpha * preferences.backgroundOpacity
         )
+    }
+
+    private var borderColor: Color {
+        state.isRepositioning ? .accentColor.opacity(0.95) : .white.opacity(0.08)
+    }
+
+    private var showsWindowControls: Bool {
+        (!preferences.overlayLocked || state.isRepositioning) && !isSettingsPreview
     }
 
     private func color(_ value: RGBAColor) -> Color {

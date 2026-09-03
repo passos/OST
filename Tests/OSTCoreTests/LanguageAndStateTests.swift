@@ -274,6 +274,25 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
 
 /// The hot key and the menu button share one decision, so the decision has to exist
 /// somewhere both can reach and a test can drive without a microphone.
+@Test func repositionShortcutIsUnboundByDefault() {
+    #expect(PreferencesSnapshot().repositionShortcut == nil)
+}
+
+@Test func olderPreferencesDecodeWithUnboundRepositionShortcut() throws {
+    let encoded = try JSONEncoder().encode(PreferencesSnapshot(
+        repositionShortcut: CaptureShortcut(keyCode: 0x0B, modifiers: CaptureShortcut.controlModifier)
+    ))
+    var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    object.removeValue(forKey: "repositionShortcut")
+
+    let decoded = try JSONDecoder().decode(
+        PreferencesSnapshot.self,
+        from: try JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded.repositionShortcut == nil)
+}
+
 @Test func commandOnlyBindingsAreRefused() {
     // The recorder's own escape hatch is the trap: pressing Command-Q to get out would
     // otherwise bind Command-Q globally and take it away from every other app.

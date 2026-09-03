@@ -21,6 +21,9 @@ final class AppModel: ObservableObject {
     /// Menu-only mirrors of the two overlay values MenuBarView renders. Kept separate
     /// from OverlayState so the menu does not rebuild on segment churn.
     @Published private(set) var menuStatusText = "Waiting"
+    /// Mirrored rather than read through overlayState: that object is deliberately not
+    /// forwarded to this one, so the menu would never redraw when the mode changes.
+    @Published private(set) var menuOverlayIsRepositioning = false
     @Published private(set) var menuDetectedLanguage: SupportedLanguage?
 
     private let registry = ProviderRegistry()
@@ -37,6 +40,7 @@ final class AppModel: ObservableObject {
     private let overlayCoordinator: OverlayCoordinator
     private let sessionLogWriter = SessionLogWriter()
     private let globalHotKey = GlobalHotKey()
+    private let repositionHotKey = GlobalHotKey()
 
     private var transcriptionTask: Task<Void, Never>?
     private var translationUpdatesTask: Task<Void, Never>?
@@ -50,6 +54,7 @@ final class AppModel: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
     private var activeSessionLogDirectory: URL?
     private var registeredCaptureShortcut: CaptureShortcut?
+    private var registeredRepositionShortcut: CaptureShortcut?
     /// Bumped whenever a start or a stop begins. start() awaits the microphone and the
     /// model load, and a hot key can now stop capture during either -- so on the way back
     /// it has to notice it was superseded instead of reporting a model-load failure the
@@ -77,9 +82,13 @@ final class AppModel: ObservableObject {
         globalHotKey.setAction { [weak self] in
             Task { @MainActor in await self?.toggleCapture() }
         }
+        repositionHotKey.setAction { [weak self] in
+            Task { @MainActor in self?.toggleTemporaryReposition() }
+        }
         preferences.onChange = { [weak self] snapshot in
             self?.overlayCoordinator.applyPreferences()
             self?.applyCaptureShortcut(snapshot.captureShortcut)
+            self?.applyRepositionShortcut(snapshot.repositionShortcut)
             Task { [weak self] in
                 guard let self else { return }
                 self.overlayState.segments = await self.segmentStore.visibleSegments(
@@ -98,6 +107,10 @@ final class AppModel: ObservableObject {
         // Views that need those objects observe them directly (SettingsView, OverlayContentView).
         // The two values the menu does read are mirrored below, de-duplicated at the source
         // because handleTranscript reassigns them on every transcript event.
+        overlayState.$isRepositioning
+            .removeDuplicates()
+            .sink { [weak self] active in self?.menuOverlayIsRepositioning = active }
+            .store(in: &cancellables)
         overlayState.$statusText
             .removeDuplicates()
             .sink { [weak self] text in self?.menuStatusText = text }
@@ -121,6 +134,7 @@ final class AppModel: ObservableObject {
         startPowerMonitoring()
         startCaptureEventMonitoring()
         applyCaptureShortcut(preferences.captureShortcut)
+        applyRepositionShortcut(preferences.repositionShortcut)
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
@@ -129,6 +143,7 @@ final class AppModel: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 self.globalHotKey.unregister()
+                self.repositionHotKey.unregister()
                 await self.stop()
             }
         }
@@ -252,6 +267,18 @@ final class AppModel: ObservableObject {
         overlayCoordinator.resetFrames()
     }
 
+    var canTemporarilyRepositionOverlay: Bool {
+        preferences.overlayLocked && overlayVisible
+    }
+
+    func toggleTemporaryReposition() {
+        if overlayCoordinator.isTemporarilyRepositioning {
+            overlayCoordinator.endTemporaryReposition()
+        } else {
+            overlayCoordinator.beginTemporaryReposition()
+        }
+    }
+
     func openAudioPrivacySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture") {
             NSWorkspace.shared.open(url)
@@ -311,6 +338,18 @@ final class AppModel: ObservableObject {
             return
         }
         registeredCaptureShortcut = shortcut
+    }
+
+    private func applyRepositionShortcut(_ shortcut: CaptureShortcut?) {
+        guard shortcut != registeredRepositionShortcut else { return }
+        repositionHotKey.unregister()
+        registeredRepositionShortcut = nil
+
+        guard let shortcut else { return }
+        guard repositionHotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers) else {
+            return
+        }
+        registeredRepositionShortcut = shortcut
     }
 
     private func handleTranscript(_ event: TranscriptEvent) async {
