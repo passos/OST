@@ -164,12 +164,20 @@ final class OverlayCoordinator {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.minSize = minimumSize(for: kind)
-        panel.contentView = NSHostingView(rootView: TranslationTaskOverlayRoot(
-            kind: kind,
-            state: state,
-            preferences: preferences,
-            translationPackCoordinator: translationPackCoordinator
-        ))
+        // The tracking area should deliver movement on its own, but this panel is never
+        // key, so widening delivery costs nothing and the resize cursor depends on it.
+        panel.acceptsMouseMovedEvents = true
+        // Wrapped rather than installed directly: a borderless panel has no resize frame of
+        // its own, and the hosting view would claim every point for its drag gesture.
+        panel.contentView = SubtitleResizeHostView(
+            contentView: NSHostingView(rootView: TranslationTaskOverlayRoot(
+                kind: kind,
+                state: state,
+                preferences: preferences,
+                translationPackCoordinator: translationPackCoordinator
+            )),
+            isLocked: preferences.overlayLocked
+        )
         panels[kind] = panel
         return panel
     }
@@ -183,6 +191,7 @@ final class OverlayCoordinator {
         let minimumSize = minimumSize(for: kind)
         panel.minSize = minimumSize
         panel.ignoresMouseEvents = preferences.overlayLocked
+        (panel.contentView as? SubtitleResizeHostView)?.setLocked(preferences.overlayLocked)
         panel.isMovableByWindowBackground = !preferences.overlayLocked
         if preferences.overlayLocked {
             panel.styleMask.remove(.resizable)
