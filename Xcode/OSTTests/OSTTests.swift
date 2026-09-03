@@ -370,4 +370,103 @@ final class OSTTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - Overlay resize band (#2)
+
+    @MainActor
+    private func makeOverlayCoordinator(
+        _ defaults: UserDefaults,
+        locked: Bool = false
+    ) -> (OverlayCoordinator, PreferencesStore) {
+        let preferences = PreferencesStore(userDefaults: defaults)
+        preferences.overlayLayout = .combined
+        preferences.overlayLocked = locked
+        return (
+            OverlayCoordinator(
+                state: OverlayState(),
+                preferences: preferences,
+                translationPackCoordinator: TranslationPackCoordinator()
+            ),
+            preferences
+        )
+    }
+
+    @MainActor
+    private func combinedPanel(addedOver existing: Set<ObjectIdentifier>) -> SubtitlePanel? {
+        NSApp.windows
+            .filter { !existing.contains(ObjectIdentifier($0)) }
+            .compactMap { $0 as? SubtitlePanel }
+            .first { $0.title == "OST Subtitles" }
+    }
+
+    /// A borderless panel has no resize frame of its own, so the band has to come from the
+    /// content view. If the hosting view is installed directly the edges are unreachable.
+    @MainActor
+    func testOverlayPanelInstallsTheResizeHostView() {
+        let suiteName = "OSTTests.resize-host.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let panel = combinedPanel(addedOver: before) else {
+            return XCTFail("show() did not create the combined overlay panel.")
+        }
+        XCTAssertTrue(
+            panel.contentView is SubtitleResizeHostView,
+            "the panel's content view must provide the resize band"
+        )
+    }
+
+    /// The band must claim its own points, or the SwiftUI drag gesture swallows them and the
+    /// user can only ever move the window, never resize it.
+    @MainActor
+    func testResizeBandClaimsEdgePointsButNotTheInterior() {
+        let suiteName = "OSTTests.resize-hit.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let host = combinedPanel(addedOver: before)?.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+
+        let bounds = host.bounds
+        XCTAssertIdentical(
+            host.hitTest(host.convert(CGPoint(x: bounds.midX, y: 2), to: host.superview)), host,
+            "a point on the bottom edge must belong to the resize band"
+        )
+        XCTAssertFalse(
+            host.hitTest(host.convert(CGPoint(x: bounds.midX, y: bounds.midY), to: host.superview)) === host,
+            "the interior must fall through to the SwiftUI content"
+        )
+    }
+
+    /// Locking the overlay passes clicks through, so it must also stop offering a resize band.
+    @MainActor
+    func testLockedOverlayOffersNoResizeBand() {
+        let suiteName = "OSTTests.resize-locked.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults, locked: true)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let host = combinedPanel(addedOver: before)?.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+
+        XCTAssertTrue(host.isLocked, "the host view must be told the overlay is locked")
+        let bounds = host.bounds
+        XCTAssertFalse(
+            host.hitTest(host.convert(CGPoint(x: bounds.midX, y: 2), to: host.superview)) === host,
+            "a locked overlay must not claim its edges for resizing"
+        )
+    }
 }

@@ -81,4 +81,43 @@ public enum OverlayResizeGeometry {
             .trailing: CGRect(x: bounds.maxX - margin, y: bounds.minY + margin, width: margin, height: innerHeight),
         ]
     }
+
+    /// The frame a drag of `translation` on `edge` produces, clamped to `minimumSize`.
+    ///
+    /// `translation` is in AppKit screen deltas (y grows upwards). Dragging a leading or
+    /// bottom edge moves the origin so the opposite edge stays where it is; clamping at the
+    /// minimum therefore has to clamp the origin as well, or shrinking past the limit would
+    /// walk the whole window sideways.
+    public static func resizedFrame(
+        _ frame: CGRect,
+        edge: OverlayResizeEdge,
+        translation: CGSize,
+        minimumSize: CGSize
+    ) -> CGRect {
+        var result = frame
+
+        switch edge {
+        case .leading, .topLeading, .bottomLeading:
+            let width = max(minimumSize.width, frame.width - translation.width)
+            result.origin.x = frame.maxX - width
+            result.size.width = width
+        case .trailing, .topTrailing, .bottomTrailing:
+            result.size.width = max(minimumSize.width, frame.width + translation.width)
+        case .top, .bottom:
+            break
+        }
+
+        switch edge {
+        case .bottom, .bottomLeading, .bottomTrailing:
+            let height = max(minimumSize.height, frame.height - translation.height)
+            result.origin.y = frame.maxY - height
+            result.size.height = height
+        case .top, .topLeading, .topTrailing:
+            result.size.height = max(minimumSize.height, frame.height + translation.height)
+        case .leading, .trailing:
+            break
+        }
+
+        return result
+    }
 }
