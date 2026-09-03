@@ -497,4 +497,91 @@ final class OSTTests: XCTestCase {
         coordinator.applyPreferences()
         XCTAssertFalse(host.isLocked, "unlocking it again must restore the band")
     }
+
+    /// Cursor rects are the key-window mechanism, and this panel can never be key
+    /// (`SubtitlePanel.canBecomeKey` is false, the style mask is `.nonactivatingPanel`, and the
+    /// app runs as `.accessory`). So the band has to carry an `.activeAlways` tracking area —
+    /// the only route that delivers pointer events to a background app's floating window.
+    @MainActor
+    func testResizeCursorDoesNotDependOnBecomingKey() {
+        let suiteName = "OSTTests.resize-tracking.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let panel = combinedPanel(addedOver: before),
+              let host = panel.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+
+        XCTAssertFalse(panel.canBecomeKey, "the premise of this test is that the panel is never key")
+        guard let area = host.trackingAreas.first(where: { $0.owner === host }) else {
+            return XCTFail("the resize band installed no tracking area, so it can never see the pointer")
+        }
+        XCTAssertTrue(
+            area.options.contains(.activeAlways),
+            "anything narrower than .activeAlways is scoped to the key window or the active app"
+        )
+        XCTAssertTrue(area.options.contains(.mouseMoved), "the band needs per-point pointer updates")
+        XCTAssertFalse(
+            area.options.contains(.cursorUpdate),
+            ".cursorUpdate is documented as unsupported together with .activeAlways"
+        )
+    }
+
+    /// The forward direction: a pointer sitting on the band must actually select a resize
+    /// cursor. Without this, deleting the whole cursor path leaves every other test green.
+    @MainActor
+    func testPointerOnTheBandSelectsAResizeCursor() {
+        let suiteName = "OSTTests.resize-cursor.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, _) = makeOverlayCoordinator(defaults)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let host = combinedPanel(addedOver: before)?.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+
+        let bounds = host.bounds
+        host.updateResizeCursor(at: CGPoint(x: bounds.midX, y: 2))
+        XCTAssertEqual(host.activeCursorEdge, .bottom, "the bottom edge must offer a vertical resize")
+
+        host.updateResizeCursor(at: CGPoint(x: 2, y: 2))
+        XCTAssertEqual(host.activeCursorEdge, .bottomLeading, "corners win over the edges they touch")
+
+        host.updateResizeCursor(at: CGPoint(x: bounds.midX, y: bounds.midY))
+        XCTAssertNil(host.activeCursorEdge, "the interior must hand the cursor back")
+    }
+
+    /// Locking passes clicks through, so the cursor must stop advertising a grab it will refuse.
+    @MainActor
+    func testLockedOverlayShowsNoResizeCursor() {
+        let suiteName = "OSTTests.resize-cursor-locked.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let (coordinator, preferences) = makeOverlayCoordinator(defaults, locked: false)
+        defer { coordinator.hide() }
+        let before = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let host = combinedPanel(addedOver: before)?.contentView as? SubtitleResizeHostView else {
+            return XCTFail("the panel did not install a SubtitleResizeHostView.")
+        }
+
+        let edgePoint = CGPoint(x: host.bounds.midX, y: 2)
+        host.updateResizeCursor(at: edgePoint)
+        XCTAssertEqual(host.activeCursorEdge, .bottom)
+
+        preferences.overlayLocked = true
+        coordinator.applyPreferences()
+        XCTAssertNil(host.activeCursorEdge, "locking must drop the resize cursor already on screen")
+        host.updateResizeCursor(at: edgePoint)
+        XCTAssertNil(host.activeCursorEdge, "a locked overlay must never re-arm it")
+    }
 }
