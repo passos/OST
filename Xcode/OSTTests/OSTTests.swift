@@ -237,4 +237,109 @@ final class OSTTests: XCTestCase {
         XCTAssertNotIdentical(shared, hidden, "the panel must be rebuilt, not mutated in place")
         XCTAssertEqual(shared.sharingType, .readOnly, "turning the preference off must restore the default sharing type")
     }
+
+    // MARK: - Menu invalidation scope (#1)
+
+    /// AppModel.init() builds a PreferencesStore on UserDefaults.standard, so any test that
+    /// mutates preferences would overwrite the developer's real settings. Snapshot and restore.
+    @MainActor
+    private func withPreservedStandardPreferences(_ body: () throws -> Void) rethrows {
+        let key = "OST.preferences.v1"
+        let saved = UserDefaults.standard.data(forKey: key)
+        defer {
+            if let saved {
+                UserDefaults.standard.set(saved, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        try body()
+    }
+
+    @MainActor
+    func testDownloadProgressDoesNotInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            model.modelDownloader.statusByModelID["mlx-community/model"] = ModelDownloadStatus(
+                requestID: UUID(),
+                modelID: "mlx-community/model",
+                revision: String(repeating: "a", count: 40),
+                phase: .downloading,
+                completedBytes: 1,
+                totalBytes: 100
+            )
+
+            XCTAssertEqual(
+                republished, 0,
+                "download progress arrives every 500ms and the menu shows none of it, so it must not invalidate AppModel"
+            )
+        }
+    }
+
+    @MainActor
+    func testTranscriptSegmentChurnDoesNotInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            model.overlayState.segments = []
+            model.overlayState.segments = []
+
+            XCTAssertEqual(
+                republished, 0,
+                "segments change at speech rate and the menu never reads them, so they must not invalidate AppModel"
+            )
+        }
+    }
+
+    /// Guards against "fix" the flicker by deleting every forward: the menu really does read
+    /// preferences, so that one must keep invalidating AppModel.
+    @MainActor
+    func testPreferenceChangesStillInvalidateTheMenu() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            model.preferences.targetLanguage =
+                model.preferences.targetLanguage == .korean ? .english : .korean
+
+            XCTAssertGreaterThan(
+                republished, 0,
+                "the menu renders preference-derived labels, so preference changes must still invalidate it"
+            )
+        }
+    }
+
+    @MainActor
+    func testRepeatedIdenticalCaptureStatusInvalidatesTheMenuOnlyOnce() {
+        withPreservedStandardPreferences {
+            let model = AppModel()
+            model.overlayState.statusText = "Capturing"
+            model.overlayState.detectedLanguage = .english
+
+            var republished = 0
+            let token = model.objectWillChange.sink { _ in republished += 1 }
+            defer { token.cancel() }
+
+            // handleTranscript reassigns both of these on every transcript event, almost always
+            // to the value they already hold. The menu must not rebuild for a no-op assignment.
+            for _ in 0..<5 {
+                model.overlayState.statusText = "Capturing"
+                model.overlayState.detectedLanguage = .english
+            }
+
+            XCTAssertEqual(
+                republished, 0,
+                "re-assigning the same status and language must not invalidate the menu"
+            )
+        }
+    }
 }
