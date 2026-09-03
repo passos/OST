@@ -164,6 +164,9 @@ final class OverlayCoordinator {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.minSize = minimumSize(for: kind)
+        // The tracking area should deliver movement on its own, but this panel is never
+        // key, so widening delivery costs nothing and the resize cursor depends on it.
+        panel.acceptsMouseMovedEvents = true
         // Wrapped rather than installed directly: a borderless panel has no resize frame of
         // its own, and the hosting view would claim every point for its drag gesture.
         panel.contentView = SubtitleResizeHostView(

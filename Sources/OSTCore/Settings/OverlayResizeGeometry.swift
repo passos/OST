@@ -60,28 +60,6 @@ public enum OverlayResizeGeometry {
         }
     }
 
-    /// One rect per edge, all inside `bounds`, for registering cursor rects.
-    public static func rects(
-        in bounds: CGRect,
-        margin: CGFloat = defaultMargin
-    ) -> [OverlayResizeEdge: CGRect] {
-        let margin = effectiveMargin(in: bounds, margin: margin)
-        guard margin > 0 else { return [:] }
-        let innerWidth = max(0, bounds.width - margin * 2)
-        let innerHeight = max(0, bounds.height - margin * 2)
-
-        return [
-            .bottomLeading: CGRect(x: bounds.minX, y: bounds.minY, width: margin, height: margin),
-            .bottomTrailing: CGRect(x: bounds.maxX - margin, y: bounds.minY, width: margin, height: margin),
-            .topLeading: CGRect(x: bounds.minX, y: bounds.maxY - margin, width: margin, height: margin),
-            .topTrailing: CGRect(x: bounds.maxX - margin, y: bounds.maxY - margin, width: margin, height: margin),
-            .bottom: CGRect(x: bounds.minX + margin, y: bounds.minY, width: innerWidth, height: margin),
-            .top: CGRect(x: bounds.minX + margin, y: bounds.maxY - margin, width: innerWidth, height: margin),
-            .leading: CGRect(x: bounds.minX, y: bounds.minY + margin, width: margin, height: innerHeight),
-            .trailing: CGRect(x: bounds.maxX - margin, y: bounds.minY + margin, width: margin, height: innerHeight),
-        ]
-    }
-
     /// The frame a drag of `translation` on `edge` produces, clamped to `minimumSize`.
     ///
     /// `translation` is in AppKit screen deltas (y grows upwards). Dragging a leading or

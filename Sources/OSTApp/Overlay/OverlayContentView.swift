@@ -55,8 +55,7 @@ struct OverlayContentView: View {
             content
         } else {
             content
-                // Inset so the move gesture and the resize band never claim the same point.
-                .contentShape(Rectangle().inset(by: OverlayResizeGeometry.defaultMargin))
+                .contentShape(Rectangle())
                 .gesture(WindowDragGesture())
                 .allowsWindowActivationEvents(true)
         }

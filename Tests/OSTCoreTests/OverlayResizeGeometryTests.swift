@@ -53,22 +53,6 @@ private let bounds = CGRect(x: 0, y: 0, width: 400, height: 200)
     #expect(OverlayResizeGeometry.edge(at: CGPoint(x: 5, y: 1), in: tiny, margin: 8) == first)
 }
 
-@Test func overlayResizeRectsCoverEveryEdgeExactlyOnce() {
-    let rects = OverlayResizeGeometry.rects(in: bounds)
-    #expect(rects.count == OverlayResizeEdge.allCases.count)
-    for edge in OverlayResizeEdge.allCases {
-        #expect(rects[edge] != nil)
-        #expect(rects[edge]?.isEmpty == false)
-    }
-}
-
-/// Every rect must sit inside the view, or AppKit would register cursor rects off-view.
-@Test func overlayResizeRectsStayInsideTheBounds() {
-    for (_, rect) in OverlayResizeGeometry.rects(in: bounds) {
-        #expect(bounds.contains(rect))
-    }
-}
-
 // MARK: - Resize drag arithmetic
 
 private let start = CGRect(x: 100, y: 100, width: 400, height: 200)
