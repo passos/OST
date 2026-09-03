@@ -104,6 +104,16 @@ final class OverlayCoordinator {
 
     func applyPreferences() {
         guard isVisible else { return }
+        // A temporary unlock only means anything on top of a real lock. Turning the lock
+        // off during one would leave the accent border and the "finish" entry sitting on
+        // an overlay that is already unlocked, waiting out a timer for nothing. Cleared
+        // inline rather than through endTemporaryReposition(), which calls back into here.
+        if isTemporarilyRepositioning, !preferences.overlayLocked {
+            temporaryRepositionTask?.cancel()
+            temporaryRepositionTask = nil
+            isTemporarilyRepositioning = false
+            state.isRepositioning = false
+        }
         // NSWindow.sharingType cannot be moved back off .none once it is set, so the
         // panels have to be rebuilt when the preference changes. Frame autosave restores
         // each panel's position and size, so the rebuild is invisible to the user.
@@ -168,6 +178,9 @@ final class OverlayCoordinator {
             } catch {
                 return
             }
+            // Cancellation between the sleep returning and this line running would
+            // otherwise let a finished session's timer end the one the user just started.
+            guard !Task.isCancelled else { return }
             self?.endTemporaryReposition()
         }
     }

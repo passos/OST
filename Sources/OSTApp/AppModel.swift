@@ -271,10 +271,6 @@ final class AppModel: ObservableObject {
         preferences.overlayLocked && overlayVisible
     }
 
-    func beginTemporaryReposition() {
-        overlayCoordinator.beginTemporaryReposition()
-    }
-
     func toggleTemporaryReposition() {
         if overlayCoordinator.isTemporarilyRepositioning {
             overlayCoordinator.endTemporaryReposition()

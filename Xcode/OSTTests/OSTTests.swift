@@ -787,12 +787,44 @@ final class OSTTests: XCTestCase {
         coordinator.beginTemporaryReposition()
         XCTAssertFalse(panel.ignoresMouseEvents)
 
-        try await Task.sleep(for: .milliseconds(600))
+        let deadline = Date().addingTimeInterval(5)
+        while coordinator.isTemporarilyRepositioning, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
         XCTAssertTrue(
             panel.ignoresMouseEvents,
             "an untouched reposition must expire rather than leave the overlay solid"
         )
         XCTAssertFalse(coordinator.isTemporarilyRepositioning)
+    }
+
+    /// The mode borrows against the lock, so it cannot outlive it. Unlocking during a
+    /// reposition otherwise left the accent border and the "finish" entry on an overlay
+    /// that was already unlocked, waiting out a timer for nothing.
+    @MainActor
+    func testUnlockingDuringARepositionEndsTheMode() {
+        let suiteName = "OSTTests.reposition-unlock.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let preferences = PreferencesStore(userDefaults: defaults)
+        preferences.overlayLayout = .combined
+        preferences.overlayLocked = true
+        let state = OverlayState()
+        let coordinator = OverlayCoordinator(
+            state: state,
+            preferences: preferences,
+            translationPackCoordinator: TranslationPackCoordinator()
+        )
+        defer { coordinator.hide() }
+        coordinator.show()
+        coordinator.beginTemporaryReposition()
+        XCTAssertTrue(coordinator.isTemporarilyRepositioning)
+
+        preferences.overlayLocked = false
+        coordinator.applyPreferences()
+        XCTAssertFalse(coordinator.isTemporarilyRepositioning)
+        XCTAssertFalse(state.isRepositioning, "the overlay must stop advertising the mode")
     }
 
     /// The mode is invisible unless the overlay says so, and a mode the user cannot see is

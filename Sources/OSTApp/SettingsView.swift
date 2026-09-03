@@ -41,6 +41,7 @@ struct SettingsView: View {
     private enum ShortcutRecorderError {
         case notRegistrable
         case needsStrongerModifiers
+        case alreadyUsed
     }
 
     var body: some View {
@@ -597,6 +598,8 @@ struct SettingsView: View {
             return t("That shortcut could not be registered.")
         case .needsStrongerModifiers:
             return t("Add Control or Option. A Command-only shortcut would be taken from every app.")
+        case .alreadyUsed:
+            return t("That shortcut is already assigned to the other action.")
         }
     }
 
@@ -627,6 +630,13 @@ struct SettingsView: View {
         // Escape is how anyone leaves a recorder, so it means "never mind" rather than
         // "bind Escape globally".
         if shortcut.keyCode == CaptureShortcut.escapeKeyCode, shortcut.modifiers == 0 {
+            stopShortcutRecording()
+            return nil
+        }
+        // One combination bound to both slots would fire both actions on a single press.
+        if shortcut == self.shortcut(for: slot == .capture ? .reposition : .capture) {
+            shortcutError = .alreadyUsed
+            shortcutErrorSlot = slot
             stopShortcutRecording()
             return nil
         }
