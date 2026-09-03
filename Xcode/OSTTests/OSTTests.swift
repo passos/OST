@@ -193,4 +193,48 @@ final class OSTTests: XCTestCase {
 
         XCTAssertEqual(coordinator.configuration, first)
     }
+
+    @MainActor
+    func testOverlayPanelIsExcludedFromScreenCaptureUntilThePreferenceIsTurnedOff() {
+        let suiteName = "OSTTests.overlay-screen-capture.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let preferences = PreferencesStore(userDefaults: defaults)
+        preferences.overlayLayout = .combined
+        let coordinator = OverlayCoordinator(
+            state: OverlayState(),
+            preferences: preferences,
+            translationPackCoordinator: TranslationPackCoordinator()
+        )
+        defer { coordinator.hide() }
+
+        // Other tests in this file also create overlay panels, so a title lookup across
+        // NSApp.windows is ambiguous; match only on windows this coordinator just added.
+        func combinedPanel(addedOver existing: Set<ObjectIdentifier>) -> SubtitlePanel? {
+            NSApp.windows
+                .filter { !existing.contains(ObjectIdentifier($0)) }
+                .compactMap { $0 as? SubtitlePanel }
+                .first { $0.title == "OST Subtitles" }
+        }
+
+        let beforeShow = Set(NSApp.windows.map(ObjectIdentifier.init))
+        coordinator.show()
+        guard let hidden = combinedPanel(addedOver: beforeShow) else {
+            return XCTFail("show() did not create the combined overlay panel.")
+        }
+        XCTAssertTrue(preferences.hideOverlayInScreenCapture, "the preference should default to on")
+        XCTAssertEqual(hidden.sharingType, .none, "the overlay must be excluded from screen capture by default")
+
+        // sharingType cannot be moved back off .none, so turning the preference off has to
+        // rebuild the panel. Look the panel up again rather than reusing the old object.
+        let beforeRebuild = Set(NSApp.windows.map(ObjectIdentifier.init))
+        preferences.hideOverlayInScreenCapture = false
+        coordinator.applyPreferences()
+        guard let shared = combinedPanel(addedOver: beforeRebuild) else {
+            return XCTFail("turning the preference off did not rebuild the combined overlay panel.")
+        }
+        XCTAssertNotIdentical(shared, hidden, "the panel must be rebuilt, not mutated in place")
+        XCTAssertEqual(shared.sharingType, .readOnly, "turning the preference off must restore the default sharing type")
+    }
 }

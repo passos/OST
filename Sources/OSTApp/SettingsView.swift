@@ -369,10 +369,10 @@ struct SettingsView: View {
             }
             Section(t("Window controls")) {
                 Toggle(t("Lock window and pass clicks through"), isOn: overlayLockedBinding)
-                Toggle(t("Hide overlay in screenshots and screen recordings"), isOn: hideOverlayInScreenCaptureBinding)
                 Text(t("Unlock the overlay to resize it from an edge or drag its background to move it."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle(t("Hide overlay in screenshots and screen recordings"), isOn: hideOverlayInScreenCaptureBinding)
                 Button(t("Reset overlay position and size")) { model.resetOverlayFrames() }
             }
             Section(t("Overlay window preview")) {
