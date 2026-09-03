@@ -253,6 +253,90 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
     #expect(decoded.sessionLogDirectoryPath == "/tmp/OST")
 }
 
+@Test func captureShortcutIsUnboundByDefault() {
+    #expect(PreferencesSnapshot().captureShortcut == nil)
+}
+
+@Test func olderPreferencesDecodeWithUnboundCaptureShortcut() throws {
+    let encoded = try JSONEncoder().encode(PreferencesSnapshot(
+        captureShortcut: CaptureShortcut(keyCode: 0x0B, modifiers: 0x000D_0000)
+    ))
+    var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    object.removeValue(forKey: "captureShortcut")
+
+    let decoded = try JSONDecoder().decode(
+        PreferencesSnapshot.self,
+        from: try JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded.captureShortcut == nil)
+}
+
+/// The hot key and the menu button share one decision, so the decision has to exist
+/// somewhere both can reach and a test can drive without a microphone.
+@Test func commandOnlyBindingsAreRefused() {
+    // The recorder's own escape hatch is the trap: pressing Command-Q to get out would
+    // otherwise bind Command-Q globally and take it away from every other app.
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0C, modifiers: CaptureShortcut.commandModifier) == false)
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0C, modifiers: 0) == false)
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: CaptureShortcut.escapeKeyCode, modifiers: CaptureShortcut.controlModifier) == false)
+}
+
+@Test func bindingsCarryingControlOrOptionAreAccepted() {
+    let control = CaptureShortcut.controlModifier
+    let option = CaptureShortcut.optionModifier
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0B, modifiers: control | option))
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0B, modifiers: option))
+    // Command is fine as long as it is not the only modifier.
+    #expect(CaptureShortcut.isAcceptableBinding(keyCode: 0x0B, modifiers: control | CaptureShortcut.commandModifier))
+}
+
+/// Why start() carries a generation guard: once a hot key stops capture mid-start, the
+/// machine is back at .idle, and the suspended start's own transition is then illegal.
+/// Without the guard that throw is reported to the user as a model-load failure.
+@Test func aStartThatResumesAfterAStopCannotReachRunning() async throws {
+    let machine = CaptureStateMachine()
+    #expect(try await machine.transition(to: .requestingPermission) == .requestingPermission)
+    #expect(try await machine.transition(to: .preparingModels) == .preparingModels)
+    #expect(try await machine.transition(to: .stopping) == .stopping)
+    #expect(try await machine.transition(to: .idle) == .idle)
+
+    await #expect(throws: CaptureTransitionError.self) {
+        _ = try await machine.transition(to: .running)
+    }
+}
+
+/// toggleIntent promises a stop while capture is still coming up, so the state machine has
+/// to accept that stop. It did not before: stop() already let .preparingModels through while
+/// the machine rejected the transition, so the hot key would have hit the failure path.
+@Test func captureCanBeStoppedWhileItIsStillComingUp() async throws {
+    let fromPermission = CaptureStateMachine()
+    #expect(try await fromPermission.transition(to: .requestingPermission) == .requestingPermission)
+    #expect(try await fromPermission.transition(to: .stopping) == .stopping)
+
+    let fromModels = CaptureStateMachine()
+    #expect(try await fromModels.transition(to: .requestingPermission) == .requestingPermission)
+    #expect(try await fromModels.transition(to: .preparingModels) == .preparingModels)
+    #expect(try await fromModels.transition(to: .stopping) == .stopping)
+}
+
+@Test func toggleIntentStartsFromRestingStates() {
+    #expect(CaptureState.idle.toggleIntent == .start)
+    #expect(CaptureState.failed(.permissionDenied).toggleIntent == .start)
+}
+
+@Test func toggleIntentStopsWhileCaptureIsComingUpOrRunning() {
+    #expect(CaptureState.running.toggleIntent == .stop)
+    // Pressing the hot key during start-up must cancel it, not queue a second start --
+    // otherwise a slow model load looks like a dead shortcut.
+    #expect(CaptureState.requestingPermission.toggleIntent == .stop)
+    #expect(CaptureState.preparingModels.toggleIntent == .stop)
+}
+
+@Test func toggleIntentDoesNothingWhileAlreadyStopping() {
+    #expect(CaptureState.stopping.toggleIntent == nil)
+}
+
 @Test func sessionLogWriterCreatesSeparateStableFiles() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appending(path: UUID().uuidString, directoryHint: .isDirectory)

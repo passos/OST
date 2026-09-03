@@ -173,6 +173,11 @@ final class PreferencesStore: ObservableObject {
         set { snapshot.sessionLogDirectoryPath = newValue }
     }
 
+    var captureShortcut: CaptureShortcut? {
+        get { snapshot.captureShortcut }
+        set { snapshot.captureShortcut = newValue }
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(snapshot) {
             userDefaults.set(data, forKey: Self.storageKey)

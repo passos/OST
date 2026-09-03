@@ -58,6 +58,36 @@ public enum AppDisplayLanguage: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public struct CaptureShortcut: Codable, Sendable, Equatable {
+    public var keyCode: UInt32
+    public var modifiers: UInt32
+
+    public init(keyCode: UInt32, modifiers: UInt32) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+    }
+
+    // Carbon's modifier bits, restated so OSTCore stays free of Carbon. An app-side test
+    // asserts these still equal cmdKey / shiftKey / optionKey / controlKey.
+    public static let commandModifier: UInt32 = 0x0100
+    public static let shiftModifier: UInt32 = 0x0200
+    public static let optionModifier: UInt32 = 0x0800
+    public static let controlModifier: UInt32 = 0x1000
+    public static let escapeKeyCode: UInt32 = 0x35
+
+    /// Whether this combination may be claimed system-wide.
+    ///
+    /// Command on its own is how nearly every application spells its menu shortcuts, so a
+    /// global Command+key binding swallows that command everywhere until the user clears
+    /// it -- recording one by pressing Command-Q to escape the recorder is the obvious way
+    /// to get bitten. Requiring a second modifier costs one key and removes the whole
+    /// class, which is cheaper than maintaining a list of combinations to avoid.
+    public static func isAcceptableBinding(keyCode: UInt32, modifiers: UInt32) -> Bool {
+        guard modifiers != 0, modifiers != commandModifier else { return false }
+        return keyCode != escapeKeyCode
+    }
+}
+
 public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var sourceMode: SourceLanguageMode
     public var targetLanguage: SupportedLanguage
@@ -85,6 +115,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var sessionLoggingEnabled: Bool
     public var sessionLogDirectoryBookmark: Data?
     public var sessionLogDirectoryPath: String?
+    public var captureShortcut: CaptureShortcut?
 
     public init(
         sourceMode: SourceLanguageMode = .fixed(.english),
@@ -112,7 +143,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         appDisplayLanguage: AppDisplayLanguage = .english,
         sessionLoggingEnabled: Bool = false,
         sessionLogDirectoryBookmark: Data? = nil,
-        sessionLogDirectoryPath: String? = nil
+        sessionLogDirectoryPath: String? = nil,
+        captureShortcut: CaptureShortcut? = nil
     ) {
         self.sourceMode = sourceMode
         self.targetLanguage = targetLanguage
@@ -140,6 +172,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         self.sessionLoggingEnabled = sessionLoggingEnabled
         self.sessionLogDirectoryBookmark = sessionLogDirectoryBookmark
         self.sessionLogDirectoryPath = sessionLogDirectoryPath
+        self.captureShortcut = captureShortcut
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -169,6 +202,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         case sessionLoggingEnabled
         case sessionLogDirectoryBookmark
         case sessionLogDirectoryPath
+        case captureShortcut
     }
 
     public init(from decoder: Decoder) throws {
@@ -201,7 +235,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
             appDisplayLanguage: try values.decodeIfPresent(AppDisplayLanguage.self, forKey: .appDisplayLanguage) ?? .english,
             sessionLoggingEnabled: try values.decodeIfPresent(Bool.self, forKey: .sessionLoggingEnabled) ?? false,
             sessionLogDirectoryBookmark: try values.decodeIfPresent(Data.self, forKey: .sessionLogDirectoryBookmark),
-            sessionLogDirectoryPath: try values.decodeIfPresent(String.self, forKey: .sessionLogDirectoryPath)
+            sessionLogDirectoryPath: try values.decodeIfPresent(String.self, forKey: .sessionLogDirectoryPath),
+            captureShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .captureShortcut)
         )
     }
 }

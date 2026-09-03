@@ -1,3 +1,4 @@
+import Carbon
 import OSTCore
 @testable import OST
 import Foundation
@@ -583,5 +584,147 @@ final class OSTTests: XCTestCase {
         XCTAssertNil(host.activeCursorEdge, "locking must drop the resize cursor already on screen")
         host.updateResizeCursor(at: edgePoint)
         XCTAssertNil(host.activeCursorEdge, "a locked overlay must never re-arm it")
+    }
+
+    // MARK: - Global capture hot key (#5)
+
+    @MainActor
+    func testCaptureShortcutRoundTripsThroughPreferencesStore() {
+        let suiteName = "OSTTests.capture-shortcut.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstStore = PreferencesStore(userDefaults: defaults)
+        firstStore.captureShortcut = CaptureShortcut(keyCode: 0x0B, modifiers: hotKeyModifiers)
+
+        let secondStore = PreferencesStore(userDefaults: defaults)
+        XCTAssertEqual(
+            secondStore.captureShortcut,
+            CaptureShortcut(keyCode: 0x0B, modifiers: hotKeyModifiers)
+        )
+    }
+
+    @MainActor
+    func testClearingCaptureShortcutReturnsPreferencesStoreToUnbound() {
+        let suiteName = "OSTTests.capture-shortcut-cleared.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstStore = PreferencesStore(userDefaults: defaults)
+        firstStore.captureShortcut = CaptureShortcut(keyCode: 0x0B, modifiers: hotKeyModifiers)
+        firstStore.captureShortcut = nil
+
+        let secondStore = PreferencesStore(userDefaults: defaults)
+        XCTAssertNil(secondStore.captureShortcut)
+    }
+
+    @MainActor
+    func testMenuBarStartStopButtonUsesAppModelToggleCapture() throws {
+        let _: (AppModel) -> () async -> Void = AppModel.toggleCapture
+        let menuBarViewSource = try String(
+            contentsOf: projectRoot.appending(path: "Sources/OSTApp/MenuBarView.swift"),
+            encoding: .utf8
+        )
+
+        // SwiftUI Button actions are hard to invoke without rebuilding the menu in a GUI
+        // session, so this source assertion guards the dispatch shape directly.
+        XCTAssertTrue(menuBarViewSource.contains("await model.toggleCapture()"))
+        XCTAssertFalse(
+            menuBarViewSource.contains("await model.start()")
+                || menuBarViewSource.contains("await model.stop()"),
+            "the action must not re-derive start/stop next to toggleCapture()"
+        )
+        // The label has to be read off the same decision the action takes. Branching on
+        // `== .running` made the button read "Start" while it was about to cancel a start
+        // that was still coming up.
+        XCTAssertTrue(menuBarViewSource.contains("toggleIntent == .stop"))
+        XCTAssertFalse(menuBarViewSource.contains("model.captureState == .running"))
+    }
+
+    /// OSTCore restates Carbon's modifier bits so it need not import Carbon. If Apple ever
+    /// moved them, every stored shortcut would silently rebind to something else.
+    func testShortcutModifierConstantsStillMatchCarbon() {
+        XCTAssertEqual(CaptureShortcut.commandModifier, UInt32(cmdKey))
+        XCTAssertEqual(CaptureShortcut.shiftModifier, UInt32(shiftKey))
+        XCTAssertEqual(CaptureShortcut.optionModifier, UInt32(optionKey))
+        XCTAssertEqual(CaptureShortcut.controlModifier, UInt32(controlKey))
+        XCTAssertEqual(CaptureShortcut.escapeKeyCode, UInt32(kVK_Escape))
+    }
+
+    @MainActor
+    func testRegistrarRefusesACommandOnlyCombination() {
+        let registrar = GlobalHotKey()
+        defer { registrar.unregister() }
+
+        XCTAssertFalse(registrar.register(keyCode: 0x0C, modifiers: UInt32(cmdKey)))
+    }
+
+    @MainActor
+    func testRegisteringCaptureShortcutReportsSuccess() {
+        let registrar = GlobalHotKey()
+        defer { registrar.unregister() }
+
+        XCTAssertTrue(registrar.register(keyCode: 0x0B, modifiers: hotKeyModifiers))
+    }
+
+    /// Two `register` calls returning true would also be true of a registrar that leaked the
+    /// first hot key, so the assertion has to be that the first combination came free: a
+    /// second registrar can only claim it if the first one really let go.
+    @MainActor
+    func testRebindingReleasesThePreviousCaptureShortcut() {
+        let registrar = GlobalHotKey()
+        defer { registrar.unregister() }
+        XCTAssertTrue(registrar.register(keyCode: 0x0B, modifiers: hotKeyModifiers))
+        XCTAssertTrue(registrar.register(keyCode: 0x0C, modifiers: hotKeyModifiers))
+
+        let other = GlobalHotKey()
+        defer { other.unregister() }
+        XCTAssertTrue(
+            other.register(keyCode: 0x0B, modifiers: hotKeyModifiers),
+            "rebinding must free the old combination, not hold both"
+        )
+    }
+
+    @MainActor
+    func testUnregisteringWithoutARegisteredCaptureShortcutIsANoOp() {
+        let registrar = GlobalHotKey()
+
+        registrar.unregister()
+    }
+
+    /// Carbon itself would happily grab a bare key system-wide, which would swallow that
+    /// letter in every other app. Refusing a modifier-less combination is this registrar's
+    /// own policy, and the caller has to be able to see the refusal.
+    @MainActor
+    func testCaptureShortcutWithoutModifiersIsRefused() {
+        let registrar = GlobalHotKey()
+        defer { registrar.unregister() }
+
+        XCTAssertFalse(registrar.register(keyCode: 0x0B, modifiers: 0))
+    }
+
+    @MainActor
+    func testCarbonEventHandlerIsInstalledOnlyOnceForMultipleRegistrars() {
+        let first = GlobalHotKey()
+        let second = GlobalHotKey()
+        defer {
+            first.unregister()
+            second.unregister()
+        }
+
+        XCTAssertTrue(first.register(keyCode: 0x0B, modifiers: hotKeyModifiers))
+        XCTAssertTrue(second.register(keyCode: 0x0C, modifiers: hotKeyModifiers))
+        XCTAssertEqual(GlobalHotKey.installedEventHandlerCountForTesting, 1)
+    }
+
+    private var hotKeyModifiers: UInt32 {
+        UInt32(controlKey | optionKey | shiftKey)
+    }
+
+    private var projectRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }
