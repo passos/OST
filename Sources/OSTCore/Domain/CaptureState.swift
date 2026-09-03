@@ -39,6 +39,22 @@ public enum CaptureState: Sendable, Equatable {
     case running
     case stopping
     case failed(CaptureFailure)
+
+    public var toggleIntent: CaptureToggleIntent? {
+        switch self {
+        case .idle, .failed:
+            .start
+        case .requestingPermission, .preparingModels, .running:
+            .stop
+        case .stopping:
+            nil
+        }
+    }
+}
+
+public enum CaptureToggleIntent: Sendable, Equatable {
+    case start
+    case stop
 }
 
 public enum CaptureTransitionError: Error, Sendable, Equatable {
@@ -65,8 +81,10 @@ public actor CaptureStateMachine {
              (.idle, .failed),
              (.requestingPermission, .preparingModels),
              (.requestingPermission, .failed),
+             (.requestingPermission, .stopping),
              (.preparingModels, .running),
              (.preparingModels, .failed),
+             (.preparingModels, .stopping),
              (.running, .stopping),
              (.running, .failed),
              (.stopping, .idle),

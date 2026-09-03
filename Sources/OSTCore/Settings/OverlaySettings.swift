@@ -58,6 +58,16 @@ public enum AppDisplayLanguage: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public struct CaptureShortcut: Codable, Sendable, Equatable {
+    public var keyCode: UInt32
+    public var modifiers: UInt32
+
+    public init(keyCode: UInt32, modifiers: UInt32) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+    }
+}
+
 public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var sourceMode: SourceLanguageMode
     public var targetLanguage: SupportedLanguage
@@ -85,6 +95,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
     public var sessionLoggingEnabled: Bool
     public var sessionLogDirectoryBookmark: Data?
     public var sessionLogDirectoryPath: String?
+    public var captureShortcut: CaptureShortcut?
 
     public init(
         sourceMode: SourceLanguageMode = .fixed(.english),
@@ -112,7 +123,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         appDisplayLanguage: AppDisplayLanguage = .english,
         sessionLoggingEnabled: Bool = false,
         sessionLogDirectoryBookmark: Data? = nil,
-        sessionLogDirectoryPath: String? = nil
+        sessionLogDirectoryPath: String? = nil,
+        captureShortcut: CaptureShortcut? = nil
     ) {
         self.sourceMode = sourceMode
         self.targetLanguage = targetLanguage
@@ -140,6 +152,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         self.sessionLoggingEnabled = sessionLoggingEnabled
         self.sessionLogDirectoryBookmark = sessionLogDirectoryBookmark
         self.sessionLogDirectoryPath = sessionLogDirectoryPath
+        self.captureShortcut = captureShortcut
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -169,6 +182,7 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
         case sessionLoggingEnabled
         case sessionLogDirectoryBookmark
         case sessionLogDirectoryPath
+        case captureShortcut
     }
 
     public init(from decoder: Decoder) throws {
@@ -201,7 +215,8 @@ public struct PreferencesSnapshot: Codable, Sendable, Equatable {
             appDisplayLanguage: try values.decodeIfPresent(AppDisplayLanguage.self, forKey: .appDisplayLanguage) ?? .english,
             sessionLoggingEnabled: try values.decodeIfPresent(Bool.self, forKey: .sessionLoggingEnabled) ?? false,
             sessionLogDirectoryBookmark: try values.decodeIfPresent(Data.self, forKey: .sessionLogDirectoryBookmark),
-            sessionLogDirectoryPath: try values.decodeIfPresent(String.self, forKey: .sessionLogDirectoryPath)
+            sessionLogDirectoryPath: try values.decodeIfPresent(String.self, forKey: .sessionLogDirectoryPath),
+            captureShortcut: try values.decodeIfPresent(CaptureShortcut.self, forKey: .captureShortcut)
         )
     }
 }

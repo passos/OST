@@ -36,6 +36,7 @@ final class AppModel: ObservableObject {
     private let powerMonitor = PowerStateMonitor()
     private let overlayCoordinator: OverlayCoordinator
     private let sessionLogWriter = SessionLogWriter()
+    private let globalHotKey = GlobalHotKey()
 
     private var transcriptionTask: Task<Void, Never>?
     private var translationUpdatesTask: Task<Void, Never>?
@@ -48,6 +49,7 @@ final class AppModel: ObservableObject {
     private var activated = false
     private var cancellables: Set<AnyCancellable> = []
     private var activeSessionLogDirectory: URL?
+    private var registeredCaptureShortcut: CaptureShortcut?
 
     init() {
         let preferences = PreferencesStore()
@@ -67,8 +69,12 @@ final class AppModel: ObservableObject {
             let language = preferences?.appDisplayLanguage ?? .english
             overlayState?.statusText = AppCopy.text("Translation pack setup failed — showing transcript", language: language)
         }
-        preferences.onChange = { [weak self] _ in
+        globalHotKey.setAction { [weak self] in
+            Task { @MainActor in await self?.toggleCapture() }
+        }
+        preferences.onChange = { [weak self] snapshot in
             self?.overlayCoordinator.applyPreferences()
+            self?.applyCaptureShortcut(snapshot.captureShortcut)
             Task { [weak self] in
                 guard let self else { return }
                 self.overlayState.segments = await self.segmentStore.visibleSegments(
@@ -109,12 +115,17 @@ final class AppModel: ObservableObject {
         startTranslationUpdates()
         startPowerMonitoring()
         startCaptureEventMonitoring()
+        applyCaptureShortcut(preferences.captureShortcut)
         terminationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in await self?.stop() }
+            Task { @MainActor in
+                guard let self else { return }
+                self.globalHotKey.unregister()
+                await self.stop()
+            }
         }
     }
 
@@ -169,7 +180,9 @@ final class AppModel: ObservableObject {
     }
 
     func stop() async {
-        guard captureState == .running || captureState == .preparingModels else { return }
+        guard captureState == .running
+            || captureState == .preparingModels
+            || captureState == .requestingPermission else { return }
         do {
             try await transition(to: .stopping)
         } catch {
@@ -195,6 +208,17 @@ final class AppModel: ObservableObject {
             captureState = .idle
         }
         overlayState.statusText = t("Stopped")
+    }
+
+    func toggleCapture() async {
+        switch captureState.toggleIntent {
+        case .start:
+            await start()
+        case .stop:
+            await stop()
+        case nil:
+            break
+        }
     }
 
     func restartCapture() async {
@@ -262,6 +286,18 @@ final class AppModel: ObservableObject {
 
     private func showModelSettings() {
         openSettings(tab: .models)
+    }
+
+    private func applyCaptureShortcut(_ shortcut: CaptureShortcut?) {
+        guard shortcut != registeredCaptureShortcut else { return }
+        globalHotKey.unregister()
+        registeredCaptureShortcut = nil
+
+        guard let shortcut else { return }
+        guard globalHotKey.register(keyCode: shortcut.keyCode, modifiers: shortcut.modifiers) else {
+            return
+        }
+        registeredCaptureShortcut = shortcut
     }
 
     private func handleTranscript(_ event: TranscriptEvent) async {

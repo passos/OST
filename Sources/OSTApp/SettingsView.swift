@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import OSTCore
 import SwiftUI
 
@@ -24,6 +25,9 @@ struct SettingsView: View {
     @State private var presentedNotice: PresentedNotice?
     @State private var pendingInstall: ModelDescriptor?
     @State private var pendingDelete: ModelDescriptor?
+    @State private var isRecordingCaptureShortcut = false
+    @State private var captureShortcutMonitor: Any?
+    @State private var captureShortcutError: String?
 
     var body: some View {
         TabView(selection: $model.selectedSettingsTab) {
@@ -143,8 +147,40 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section(t("Capture shortcut")) {
+                HStack {
+                    Text(captureShortcutLabel)
+                        .foregroundStyle(model.preferences.captureShortcut == nil ? .secondary : .primary)
+                    Spacer()
+                    Button(isRecordingCaptureShortcut ? t("Press shortcut") : t("Record Shortcut")) {
+                        if isRecordingCaptureShortcut {
+                            stopCaptureShortcutRecording()
+                        } else {
+                            startCaptureShortcutRecording()
+                        }
+                    }
+                    if model.preferences.captureShortcut != nil {
+                        Button(t("Clear")) {
+                            stopCaptureShortcutRecording()
+                            captureShortcutError = nil
+                            model.preferences.captureShortcut = nil
+                        }
+                    }
+                }
+                Text(t("Use at least one modifier key. Bare global keys are refused."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let captureShortcutError {
+                    Text(t(captureShortcutError))
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
         }
         .formStyle(.grouped)
+        .onDisappear {
+            stopCaptureShortcutRecording()
+        }
     }
 
     private var modelsTab: some View {
@@ -429,6 +465,13 @@ struct SettingsView: View {
         }
     }
 
+    private var captureShortcutLabel: String {
+        guard let shortcut = model.preferences.captureShortcut else {
+            return t("No shortcut set")
+        }
+        return shortcutDescription(shortcut)
+    }
+
     private var hasLowContrast: Bool {
         model.preferences.sourceColor.contrastRatio(against: model.preferences.backgroundColor) < 4.5
             || model.preferences.translationColor.contrastRatio(against: model.preferences.backgroundColor) < 4.5
@@ -509,6 +552,79 @@ struct SettingsView: View {
             text = t("The notice could not be loaded.")
         }
         presentedNotice = PresentedNotice(title: title, text: text)
+    }
+
+    private func startCaptureShortcutRecording() {
+        stopCaptureShortcutRecording()
+        captureShortcutError = nil
+        isRecordingCaptureShortcut = true
+        captureShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+            guard event.type == .keyDown else { return event }
+            return handleCaptureShortcutEvent(event)
+        }
+    }
+
+    private func stopCaptureShortcutRecording() {
+        if let captureShortcutMonitor {
+            NSEvent.removeMonitor(captureShortcutMonitor)
+            self.captureShortcutMonitor = nil
+        }
+        isRecordingCaptureShortcut = false
+    }
+
+    private func handleCaptureShortcutEvent(_ event: NSEvent) -> NSEvent? {
+        let shortcut = CaptureShortcut(
+            keyCode: UInt32(event.keyCode),
+            modifiers: carbonModifiers(from: event.modifierFlags)
+        )
+        let registrar = GlobalHotKey()
+        let accepted = registrar.register(
+            keyCode: shortcut.keyCode,
+            modifiers: shortcut.modifiers
+        )
+        registrar.unregister()
+
+        if accepted {
+            model.preferences.captureShortcut = shortcut
+            captureShortcutError = nil
+        } else {
+            captureShortcutError = "That shortcut could not be registered."
+        }
+        stopCaptureShortcutRecording()
+        return nil
+    }
+
+    private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var modifiers: UInt32 = 0
+        if flags.contains(.command) { modifiers |= UInt32(cmdKey) }
+        if flags.contains(.control) { modifiers |= UInt32(controlKey) }
+        if flags.contains(.option) { modifiers |= UInt32(optionKey) }
+        if flags.contains(.shift) { modifiers |= UInt32(shiftKey) }
+        return modifiers
+    }
+
+    private func shortcutDescription(_ shortcut: CaptureShortcut) -> String {
+        var symbols: [String] = []
+        if shortcut.modifiers & UInt32(controlKey) != 0 { symbols.append("⌃") }
+        if shortcut.modifiers & UInt32(optionKey) != 0 { symbols.append("⌥") }
+        if shortcut.modifiers & UInt32(shiftKey) != 0 { symbols.append("⇧") }
+        if shortcut.modifiers & UInt32(cmdKey) != 0 { symbols.append("⌘") }
+        symbols.append(keyName(for: shortcut.keyCode))
+        return symbols.joined(separator: " ")
+    }
+
+    private func keyName(for keyCode: UInt32) -> String {
+        [
+            0x00: "A", 0x01: "S", 0x02: "D", 0x03: "F", 0x04: "H", 0x05: "G",
+            0x06: "Z", 0x07: "X", 0x08: "C", 0x09: "V", 0x0B: "B", 0x0C: "Q",
+            0x0D: "W", 0x0E: "E", 0x0F: "R", 0x10: "Y", 0x11: "T", 0x12: "1",
+            0x13: "2", 0x14: "3", 0x15: "4", 0x16: "6", 0x17: "5", 0x18: "=",
+            0x19: "9", 0x1A: "7", 0x1B: "-", 0x1C: "8", 0x1D: "0", 0x1E: "]",
+            0x1F: "O", 0x20: "U", 0x21: "[", 0x22: "I", 0x23: "P", 0x24: "Return",
+            0x25: "L", 0x26: "J", 0x27: "'", 0x28: "K", 0x29: ";", 0x2A: "\\",
+            0x2B: ",", 0x2C: "/", 0x2D: "N", 0x2E: "M", 0x2F: ".", 0x31: "Space",
+            0x33: "Delete", 0x35: "Esc"
+        ][keyCode] ?? "Key \(keyCode)"
     }
 
     private var installConfirmationPresented: Binding<Bool> {

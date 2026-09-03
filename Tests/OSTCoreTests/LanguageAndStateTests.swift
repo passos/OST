@@ -274,6 +274,20 @@ private actor LimitedTranscriptionProvider: TranscriptionProvider {
 
 /// The hot key and the menu button share one decision, so the decision has to exist
 /// somewhere both can reach and a test can drive without a microphone.
+/// toggleIntent promises a stop while capture is still coming up, so the state machine has
+/// to accept that stop. It did not before: stop() already let .preparingModels through while
+/// the machine rejected the transition, so the hot key would have hit the failure path.
+@Test func captureCanBeStoppedWhileItIsStillComingUp() async throws {
+    let fromPermission = CaptureStateMachine()
+    #expect(try await fromPermission.transition(to: .requestingPermission) == .requestingPermission)
+    #expect(try await fromPermission.transition(to: .stopping) == .stopping)
+
+    let fromModels = CaptureStateMachine()
+    #expect(try await fromModels.transition(to: .requestingPermission) == .requestingPermission)
+    #expect(try await fromModels.transition(to: .preparingModels) == .preparingModels)
+    #expect(try await fromModels.transition(to: .stopping) == .stopping)
+}
+
 @Test func toggleIntentStartsFromRestingStates() {
     #expect(CaptureState.idle.toggleIntent == .start)
     #expect(CaptureState.failed(.permissionDenied).toggleIntent == .start)
